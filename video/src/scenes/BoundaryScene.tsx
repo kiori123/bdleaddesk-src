@@ -6,18 +6,18 @@ import { Heading } from "../components/Heading";
 import { interFontFamily, antonFontFamily } from "../fonts";
 
 const appItems = [
-  "Đăng nhập, phân quyền",
-  "Toàn bộ giao diện",
-  "Kiểm và trừ credit, soạn mail outreach",
+  "Sign-in and permissions",
+  "The entire UI",
+  "Check and deduct credit, draft outreach email",
   "Admin panel",
-  "Trạng thái job",
+  "Job status",
 ];
 
 const n8nItems = [
-  "Gọi SignalHire (search, reveal)",
-  "Sinh bio + org chart bằng LLM",
-  "Ghi mirror sang Google Sheets",
-  "Cron dọn dẹp, cảnh báo lỗi",
+  "Call SignalHire (search, reveal)",
+  "Generate bios + org charts with an LLM",
+  "Write the mirror copy to Google Sheets",
+  "Cron cleanup, error alerts",
 ];
 
 const Column: React.FC<{
@@ -89,7 +89,7 @@ export const BoundaryScene: React.FC = () => {
   return (
     <Scene background={gradients.red}>
       <Heading from={0} size={52}>
-        Ranh giới, không được lấn
+        A boundary, not to be crossed
       </Heading>
       <div style={{ height: 44 }} />
       <div style={{ display: "flex", gap: 48 }}>

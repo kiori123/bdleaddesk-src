@@ -7,10 +7,10 @@ import { Arrow } from "../components/Arrow";
 import { interFontFamily } from "../fonts";
 
 const steps = [
-  { title: "1. Kiểm hạn mức", sub: "category_credit_status.remaining" },
-  { title: "2. Ghi reserved", sub: "credit_ledger" },
-  { title: "3. Gọi n8n reveal", sub: "SignalHire" },
-  { title: "4. committed / released", sub: "callback + job_id idempotent" },
+  { title: "1. Check the budget", sub: "category_credit_status.remaining" },
+  { title: "2. Write reserved", sub: "credit_ledger" },
+  { title: "3. Call n8n to reveal", sub: "SignalHire" },
+  { title: "4. committed / released", sub: "callback + idempotent job_id" },
 ];
 
 const Step: React.FC<{ index: number; from: number }> = ({ index, from }) => {
@@ -45,7 +45,7 @@ export const CreditRuleScene: React.FC = () => {
   return (
     <Scene background={gradients.teal}>
       <Heading from={0} size={52}>
-        Credit là tiền thật
+        Credit is real money
       </Heading>
       <div style={{ height: 56 }} />
       <div style={{ position: "relative", display: "flex", gap: 90 }}>
@@ -67,7 +67,7 @@ export const CreditRuleScene: React.FC = () => {
           }),
         }}
       >
-        n8n không bao giờ tự quyết được tiêu hay không — nó không thấy được tồn kho.
+        n8n never decides whether to spend — it can't see what's left in the budget.
       </div>
     </Scene>
   );

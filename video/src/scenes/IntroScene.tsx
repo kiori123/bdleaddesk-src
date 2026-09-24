@@ -46,7 +46,7 @@ export const IntroScene: React.FC = () => {
           opacity: subOpacity,
         }}
       >
-        Công cụ nội bộ Business Development · OnPoint
+        Internal tool for the OnPoint Business Development team
       </div>
     </Scene>
   );

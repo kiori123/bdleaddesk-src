@@ -44,7 +44,7 @@ export const ClosingScene: React.FC = () => {
           maxWidth: 900,
         }}
       >
-        Tìm và xác minh decision-maker · Theo dõi tiến độ deal · Lưu tài liệu theo brand
+        Find and verify decision-makers · Track deal progress · Keep documents by brand
       </div>
     </Scene>
   );
