@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+video/node_modules/
+
+# next.js
+.next/
+video/.next/
+out/
+
+# build outputs
+video/out/
+video/build/
+dist/
+build/
+
+# env
+.vercel
+.env*
+
+# misc
+*.log
+.DS_Store
+.turbo/
