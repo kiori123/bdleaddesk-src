@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { nameKey } from '@/lib/nameKey';
+import { checkApiKey } from '@/lib/signalhire';
 
 /**
  * Dat han muc credit cho mot category trong thang hien tai.
@@ -96,6 +97,18 @@ export async function setSignalhireKey(key: string) {
   if (clean.length < 12) return { error: 'That key looks too short. Check it again.' };
   if (/\s/.test(clean)) return { error: 'The key cannot contain spaces.' };
 
+  // Xac minh key GOI DUOC SignalHire that su truoc khi luu. Hinh dang dung
+  // (do dai, khong khoang trang) khong co nghia la key dung - mot ky tu roi
+  // mat hoac mot khoang trang an (vi du ZERO WIDTH SPACE, /\s/ khong bat duoc)
+  // luc dan vao van qua duoc hai kiem tra tren nhung bi SignalHire tu choi
+  // thang voi 401. Khong kiem truoc thi loi do chi lo ra qua mot lan scan that
+  // bai sau nay - va lan scan do van tinh vao "daily search attempts" cua
+  // SignalHire nhu moi lan goi khac.
+  const check = await checkApiKey(clean);
+  if (!check.ok) {
+    return { error: `SignalHire rejected this key (${check.message}). Check for a missed or extra character and try pasting it again.` };
+  }
+
   const { error } = await supabaseAdmin()
     .from('app_setting')
     .upsert({ key: 'signalhire_api_key', value: clean, updated_at: new Date().toISOString() },
@@ -103,7 +116,7 @@ export async function setSignalhireKey(key: string) {
   if (error) return { error: error.message };
 
   revalidatePath('/admin');
-  return { ok: true };
+  return { ok: true, credits: check.credits, unlimited: check.unlimited };
 }
 
 /** Them hoac sua mot dong alias brand. */

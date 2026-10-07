@@ -772,3 +772,59 @@ export async function revealUids(apikey: string, uids: string[]) {
 
   return { ok: true as const, status: 200, message: '', people };
 }
+
+export type ApiKeyCheck =
+  | { ok: true; credits: number | null; unlimited: boolean }
+  | { ok: false; status: number; message: string };
+
+/**
+ * Xac minh mot key CO GOI DUOC SignalHire that su, khong chi dung hinh dang
+ * (do dai, khong khoang trang). Dung /credits vi day la endpoint nhe nhat -
+ * khong tinh vao "daily search attempts" (cai lam sap search/reveal) va khong
+ * tinh credit.
+ *
+ * Goi qua goiSignalHire() - CUNG hang doi 3-dong-thoi voi search/reveal, du
+ * day khong phai luot tim/reveal that. Truoc day UsagePanel.tsx tu fetch()
+ * thang, dung ngoai hang doi - mot lan kiem tra credit dung luc dang co scan
+ * chay se la request thu 4 dong thoi that su, vuot gioi han 3 cua tai khoan
+ * du moi ham tuong minh nghi minh dang o trong han muc rieng.
+ *
+ * Dung ham nay o CA HAI noi: setSignalhireKey() (actions.ts) truoc khi luu -
+ * de tu choi ngay mot key dan sai/thieu ky tu thay vi am tham luu roi chi lo
+ * ra qua mot lan scan that that bai (va lan scan do van tinh vao "daily search
+ * attempts" cua SignalHire nhu MOI lan goi khac) - va UsagePanel.tsx khi doc
+ * so du de hien thi.
+ */
+export async function checkApiKey(apikey: string): Promise<ApiKeyCheck> {
+  const key = apikey.trim();
+  if (!key) return { ok: false, status: 0, message: 'No key given.' };
+
+  let res: Response;
+  try {
+    res = await goiSignalHire(`${API}/credits`, { headers: { apikey: key } });
+  } catch (e: any) {
+    return { ok: false, status: 0, message: `Could not reach SignalHire: ${e?.message ?? 'network error'}` };
+  }
+
+  const header = res.headers.get('x-credits-left');
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    let msg = `SignalHire returned ${res.status}`;
+    try {
+      const parsed = JSON.parse(text);
+      msg = String(parsed?.error ?? parsed?.message ?? msg);
+    } catch { /* giu thong bao mac dinh */ }
+    return { ok: false, status: res.status, message: msg };
+  }
+
+  const body: any = await res.json().catch(() => ({}));
+  const raw = body?.credits ?? body?.creditsLeft ?? body?.balance ?? header;
+  const n = Number(raw);
+
+  // Goi Unlimited khong tra ve so huu han - xem ghi chu goc o UsagePanel.tsx.
+  if (raw == null || !Number.isFinite(n) || n < 0 || n > 1e8) {
+    return { ok: true, credits: null, unlimited: true };
+  }
+  return { ok: true, credits: n, unlimited: false };
+}

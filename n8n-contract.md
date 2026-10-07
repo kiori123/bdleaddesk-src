@@ -1,5 +1,16 @@
 # Hợp đồng App ↔ n8n
 
+> **Đã lỗi thời cho search/reveal.** `/webhook/lead-search` và
+> `/webhook/lead-reveal` mô tả dưới đây không còn được app gọi. Từ khi
+> `lib/signalhire.ts` gọi thẳng SignalHire (đọc key từ `app_setting`, comment
+> đầu file "Goi SignalHire THANG tu app, khong qua n8n nua"), hai webhook này
+> đứng ngoài luồng: không route nào trong `app/api/` còn tham chiếu tới
+> `N8N_SHARED_SECRET` hay các đường dẫn `/webhook/lead-*`. Giữ lại phần mô tả
+> bên dưới vì hai lý do: (1) làm sử liệu cho quyết định kiến trúc, và (2)
+> `lead-enrich` / `lead-outreach` có thể vẫn đang mô tả đúng — chưa có bằng
+> chứng trong code là đã dời hai cái đó sang app hay chưa được xây. Kiểm bằng
+> cách grep `N8N_` trước khi tin bất cứ dòng nào ở đây.
+
 ## Xác thực
 
 Bỏ hoàn toàn kiểu `?key=onpoint2026` trong URL. Mọi request từ app sang n8n gửi

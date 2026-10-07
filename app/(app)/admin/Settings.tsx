@@ -16,8 +16,9 @@ export default function Settings({ hasKey, updatedAt }: { hasKey: boolean; updat
       const res = await setSignalhireKey(value);
       if (res?.error) { setMsg(res.error); return; }
       setValue(''); setOk(true);
-      setMsg('Saved. n8n picks up the new key on the next scan.');
-      setTimeout(() => setMsg(''), 4000);
+      const balance = res.unlimited ? 'unlimited credits' : `${res.credits} credit${res.credits === 1 ? '' : 's'}`;
+      setMsg(`Saved and confirmed with SignalHire — ${balance} available. The app uses this key on the next scan or reveal.`);
+      setTimeout(() => setMsg(''), 6000);
     });
   }
 
@@ -25,14 +26,14 @@ export default function Settings({ hasKey, updatedAt }: { hasKey: boolean; updat
     <section>
       <h2 className="font-display text-base uppercase text-teal-deep">SignalHire API key</h2>
       <p className="mt-1 text-xs text-ink-faint">
-        n8n asks the app for this key on every scan. Change it here, not in n8n.
+        The app calls SignalHire directly with this key (search, reveal, credit balance). n8n is not involved.
       </p>
 
       <div className="mt-3 rounded-xl border border-line bg-white p-4">
         <div className="text-xs text-ink-dim">
           {ok
             ? `Key is set${updatedAt ? ` · updated ${updatedAt.slice(0, 10)}` : ''}`
-            : 'No key yet. n8n falls back to the one stored in its own data table.'}
+            : 'No key yet. Scan, reveal, and the credit balance above will not work until one is saved.'}
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -54,9 +55,8 @@ export default function Settings({ hasKey, updatedAt }: { hasKey: boolean; updat
         {msg && <p className="mt-2 text-[11.5px] text-ink-dim">{msg}</p>}
 
         <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">
-          A saved key cannot be read back, only overwritten. If the app is unreachable,
-          n8n falls back to the key in its own data table, so one app outage does not
-          stop scanning.
+          A saved key cannot be read back, only overwritten. There is no fallback key
+          anywhere else &mdash; this is the only copy the app uses.
         </p>
       </div>
     </section>
