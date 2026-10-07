@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx --test test/category-access.test.ts test/category-access.integration.test.ts test/scan-quota.test.ts test/signalhire.test.ts test/contact-origin.test.ts test/name-key.test.ts test/credit-sheet.test.ts test/rank.test.ts"
+    "test": "tsx --test test/category-access.test.ts test/category-access.integration.test.ts test/scan-quota.test.ts test/signalhire.test.ts test/contact-origin.test.ts test/contact-identity.test.ts test/page-all.test.ts test/name-key.test.ts test/credit-sheet.test.ts test/rank.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
