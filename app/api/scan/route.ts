@@ -9,6 +9,7 @@ import { canUseCategory } from '@/lib/credit';
 import {
   planScan, resetsAtFromPeriodStart, CALLS_PER_COMPANY_WORST_CASE, MAX_BRAND_MOI_LAN,
 } from '@/lib/scanQuota';
+import { NGAN_SACH_TIM_MS, SO_BRAND_SONG_SONG, chayTheoTho } from '@/lib/scanLimits';
 
 // Moi brand la mot lan goi SignalHire, moi lan chung 1 den 3 giay. Mac dinh 10s
 // cua Vercel khong du cho vai brand.
@@ -277,21 +278,46 @@ export async function POST(req: NextRequest) {
   // MAX_BRAND_MOI_LAN, vi han muc ngay co the da cat ngan hon ca con so do.
   const dsBrand = plan.toScan;
   const conLai = brandsCanQuet.slice(plan.toScan.length)
-    .map((b: any) => String(b?.name ?? '').trim()).filter(Boolean);
+    .map((b: any) => String(b?.name ?? '').trim()).filter(Boolean) as string[];
 
-  // Chay song song. Moi brand mot lan goi doc lap, khong ai cho ai.
   const vungTim = String(location ?? 'Vietnam and Southeast Asia');
   const tuKhoa = String(keywords ?? '').trim();
 
-  const ketQua = await Promise.all(dsBrand.map((b: any) => searchBrand({
-    apikey,
-    brand: String(b?.name ?? '').trim(),
-    tier: Number.isFinite(Number(b?.tier)) ? Number(b.tier) : 1,
-    aliases,
-    region: vungTim,
-    roles: dsRole,
-    keywords: tuKhoa,
-  })));
+  /**
+   * Chay theo THO, moi tho kiem dong ho truoc khi nhan brand tiep theo.
+   *
+   * Ban cu la `Promise.all(dsBrand.map(...))`: bung het mot luot roi de hang
+   * doi 3-dong-thoi ben trong goiSignalHire tu chen. Thong luong giong nhau
+   * (SO_BRAND_SONG_SONG dat bang dung gioi han 3 do), nhung cach cu KHONG
+   * chan gio duoc - moi ham da duoc goi ngay o giay 0 roi, nen mot phep kiem
+   * `Date.now()` dat o dau ham cung se chay o giay 0 va khong bao gio dung.
+   *
+   * Co cai chan nay thi vuot gio la xuong thang em: brand chua kip bat dau se
+   * khong chay va di thang vao `notRun`, man ket qua bao "N brands were not
+   * searched at all" va PIC quet lai. Truoc day vuot maxDuration la job ket o
+   * 'running' vinh vien, khong ai biet vi sao.
+   *
+   * Brand DA bat dau thi chay cho xong, khong cat ngang: cat giua chung se vut
+   * di nhung lan goi SignalHire da tieu luot trong tran ngay.
+   */
+  const { xong: ketQua, quaGio } = await chayTheoTho(
+    dsBrand as any[],
+    (b) => searchBrand({
+      apikey,
+      brand: String(b?.name ?? '').trim(),
+      tier: Number.isFinite(Number(b?.tier)) ? Number(b.tier) : 1,
+      aliases,
+      region: vungTim,
+      roles: dsRole,
+      keywords: tuKhoa,
+    }),
+    { hanChot: Date.now() + NGAN_SACH_TIM_MS, soTho: SO_BRAND_SONG_SONG },
+  );
+
+  // Brand het gio nhap chung vao danh sach "chua quet" cua man ket qua - voi
+  // PIC thi hai ly do (vuot tran moi lan / het gio) dan den cung mot viec:
+  // quet lai lo con lai.
+  conLai.push(...quaGio.map((b: any) => String(b?.name ?? '').trim()).filter(Boolean));
 
   // Hoc alias tu ket qua that. Chay song song va khong duoc phep lam hong lan
   // quet: ket qua da nam trong tay roi, hoc duoc hay khong la chuyen cua lan sau.

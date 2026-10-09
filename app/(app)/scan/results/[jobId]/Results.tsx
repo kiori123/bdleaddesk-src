@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { strengthOf } from '@/lib/rank';
 import { MAX_BRAND_MOI_LAN } from '@/lib/scanLimits';
-import { pollJob, type Cand, type JobView, type BrandStat } from './actions';
+import { pollJob, thuTenPhapNhan, type Cand, type JobView, type BrandStat } from './actions';
 
 /**
  * Hai viec, khong hon:
@@ -22,7 +22,7 @@ function fmt(ms: number) {
 }
 
 /**
- * "28 of 1020 shown" - de PIC phan biet ba tinh huong khac han nhau: khong
+ * "28 of 1020 found" - de PIC phan biet ba tinh huong khac han nhau: khong
  * co trong SignalHire, cong ty nho da lay het, hay cong ty lon bi loc o
  * nguon. Khong noi ra thi mot danh sach ngan trong ba ly do do trong giong
  * y het nhau, va PIC de nham "khong co trong SignalHire" thanh "brand nay
@@ -49,7 +49,7 @@ function ThongKe({ s }: { s: BrandStat | undefined }) {
   if (s.outcome === 'narrowed' && s.filterSkipped) {
     return (
       <span className="text-[11.5px] text-red">
-        {s.found} people shown but <b>not filtered</b>
+        {s.found} people found but <b>not filtered</b>
         {s.total != null ? ` (this company has ${s.total})` : ''} &mdash; the region and
         seniority filter did not run, so these are the first people in the index anywhere in
         the world, not just where you asked. Search this brand again; if it keeps happening,
@@ -60,14 +60,86 @@ function ThongKe({ s }: { s: BrandStat | undefined }) {
   if (s.outcome === 'narrowed' && s.total != null) {
     return (
       <span className="text-[11.5px] text-ink-faint">
-        {s.found} of {s.total} shown, narrowed at the source because the company is large.
+        {s.found} of {s.total} found, narrowed at the source because the company is large.
       </span>
     );
   }
   return (
     <span className="text-[11.5px] text-ink-faint">
-      {s.found} shown, everyone in SignalHire&rsquo;s index for this company.
+      {s.found} found, everyone in SignalHire&rsquo;s index for this company.
     </span>
+  );
+}
+
+/**
+ * Thu mot ten phap nhan khac cho mot brand khong tim thay ai.
+ *
+ * Dat NGAY DUOI cau "khong co trong SignalHire", vi do la dung luc PIC biet
+ * minh can mot ten khac. Truoc day cau do la ngo cut: sua alias la quyen
+ * admin, ma doi hinh co 8 PIC tren 2 admin, nen PIC con lai phai doan mot ten
+ * roi go lai ca lan quet - va doan dung cung khong duoc he thong nho.
+ *
+ * Khong luu mu: server xac minh bang mot lan goi SignalHire that, chi luu khi
+ * co nguoi that o ten do, va bao lai ngay tai cho (xem thuTenPhapNhan).
+ */
+function ThuTen({ brand, categoryId }: { brand: string; categoryId: string | null }) {
+  const [ten, setTen] = useState('');
+  const [dangChay, setDangChay] = useState(false);
+  const [ketQua, setKetQua] = useState<{ ok: boolean; chu: string } | null>(null);
+
+  async function gui() {
+    if (!ten.trim() || dangChay) return;
+    setDangChay(true); setKetQua(null);
+    try {
+      const r = await thuTenPhapNhan(brand, ten, categoryId);
+      if (!r.ok) setKetQua({ ok: false, chu: r.error });
+      else if (r.daLuu) {
+        setKetQua({
+          ok: true,
+          chu: `Found ${r.soNguoi} ${r.soNguoi === 1 ? 'person' : 'people'} under that name, and saved it `
+            + `for ${brand}. Scan ${brand} again to pull them in - and from now on it goes straight there.`,
+        });
+      } else {
+        setKetQua({ ok: false, chu: `SignalHire has nobody under that name either. Nothing was saved. Try another spelling, or the parent company.` });
+      }
+    } catch (e: any) {
+      setKetQua({ ok: false, chu: e?.message ?? 'Something went wrong.' });
+    } finally {
+      setDangChay(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 max-w-[62ch] rounded-lg border border-line bg-surface-sunk px-3.5 py-3">
+      <label className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+        Who owns {brand}?
+      </label>
+      <div className="mt-1.5 flex flex-wrap gap-2">
+        <input
+          value={ten}
+          onChange={(e) => setTen(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') gui(); }}
+          placeholder="Legal entity or parent company"
+          className="min-w-[16rem] flex-1 rounded-lg border border-line bg-white px-3 py-1.5 text-sm"
+        />
+        <button
+          type="button"
+          onClick={gui}
+          disabled={dangChay || ten.trim().length < 2}
+          className="rounded-lg bg-grad-teal px-3.5 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {dangChay ? 'Checking' : 'Check this name'}
+        </button>
+      </div>
+      <p className="mt-1.5 text-[11.5px] leading-snug text-ink-dim">
+        Nothing is saved unless SignalHire actually has people there. Costs one search, no credits.
+      </p>
+      {ketQua && (
+        <p className={`mt-2 text-[12.5px] leading-relaxed ${ketQua.ok ? 'text-teal-deep' : 'text-red-deep'}`}>
+          {ketQua.chu}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -373,10 +445,11 @@ export default function Results({
               {khongThay.map((s) => s.brand).join(', ')}
             </b>{' '}
             {khongThay.length === 1 ? 'is' : 'are'} not in SignalHire&rsquo;s index at all, under
-            the mapped company or the brand name itself. Check whether it trades under a
-            different legal entity and search that name.
+            the mapped company or the brand name itself. People usually put the company that owns
+            the brand, not the brand, so the owner&rsquo;s name is what to try.
           </p>
         )}
+        {khongThay.map((s) => <ThuTen key={s.brand} brand={s.brand} categoryId={categoryId} />)}
         {locHet.length > 0 && (
           <p className="mt-2 max-w-[62ch] text-[13px] leading-relaxed text-ink-dim">
             <b className="text-ink">
@@ -430,7 +503,17 @@ export default function Results({
         <div key={brand} className="mb-7">
           <div className="mb-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-1 border-b border-line pb-1.5">
             <span className="font-display text-sm uppercase tracking-wide text-teal-deep">{brand}</span>
-            <span className="text-[11px] font-semibold text-ink-faint">{list.length}</span>
+            {/*
+              Khi bi cat thi PHAI hien ca hai so. Mot danh sach dung 20 nguoi
+              khong kem con so tong doc het suc giong mot brand chi co 20
+              nguoi - dung cai nham lan ma ThongKe ben tren da duoc viet ra de
+              tranh. Tren du lieu that, 42% nhom brand co hon 20 nguoi.
+            */}
+            <span className="text-[11px] font-semibold text-ink-faint">
+              {(view.tongTheoBrand[brand] ?? list.length) > list.length
+                ? `top ${list.length} of ${view.tongTheoBrand[brand]}`
+                : list.length}
+            </span>
             <ThongKe s={statsByBrand.get(brand)} />
           </div>
 

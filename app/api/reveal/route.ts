@@ -3,7 +3,8 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { reserveCredit, releaseCredit, commitCredit, canUseCategory } from '@/lib/credit';
 import { nameKey } from '@/lib/nameKey';
-import { loadSettings, revealUids } from '@/lib/signalhire';
+import { khoaLinkedin } from '@/lib/contactIdentity';
+import { loadSettings, revealUids, hocAliasTuContact } from '@/lib/signalhire';
 import { rankOf } from '@/lib/orgRank';
 import { baoChoNguoi } from '@/lib/notify';
 
@@ -106,10 +107,31 @@ export async function POST(req: NextRequest) {
     const { data: brandRow0 } = await admin.from('brand').select('id')
       .eq('name_key', nameKey(tenBrand)).maybeSingle();
     if (brandRow0?.id) {
-      const { data: daCo } = await admin.from('contact').select('external_uid')
-        .eq('brand_id', brandRow0.id).in('external_uid', uidsMoi);
-      const daCoSet = new Set((daCo ?? []).map((r: any) => r.external_uid));
-      uidsMoi = uidsMoi.filter((u) => !daCoSet.has(u));
+      const { data: daCo } = await admin.from('contact')
+        .select('external_uid, linkedin_url').eq('brand_id', brandRow0.id);
+      const daCoSet = new Set((daCo ?? []).map((r: any) => r.external_uid).filter(Boolean));
+
+      // Duong DAN LINK cung phai duoc mien phi lan hai.
+      //
+      // Bo loc tren so `external_uid`, ma khi PIC dan link thi `uids` chua
+      // URL con trong DB la uid hex - khong bao gio khop, nen dan lai link cua
+      // nguoi DA CO van bi tru credit lan nua, trai voi dung loi UI da hua.
+      //
+      // So bang khoa LinkedIn da chuan hoa thi khop duoc: `linkedin_url` cua
+      // contact va duong link PIC dan deu tro ve cung mot profile. Do tren du
+      // lieu that: 98/107 duong link da dan tim ra dung contact cua no. Phan
+      // con lai chi khien lan reveal do bi tinh tien nhu hien nay, khong sinh
+      // ra hong moi; con khop nham nguoi khac thi khong xay ra duoc, vi slug
+      // LinkedIn la duy nhat cho moi nguoi.
+      const linkDaCo = new Set(
+        (daCo ?? []).map((r: any) => khoaLinkedin(r.linkedin_url)).filter(Boolean),
+      );
+
+      uidsMoi = uidsMoi.filter((u) => {
+        if (daCoSet.has(u)) return false;
+        const k = khoaLinkedin(u);
+        return !(k && linkDaCo.has(k));
+      });
     }
   }
 
@@ -212,6 +234,22 @@ export async function POST(req: NextRequest) {
   const { data: brandRow } = await admin
     .from('brand').select('id').eq('name_key', nameKey(tenBrand)).maybeSingle();
 
+  // Nguoi nao trong ket qua la do DAN LINK vao, de dat dung `source`.
+  //
+  // KHONG duoc hoi `person.uid.startsWith('http')` nhu truoc: `person.uid` la
+  // uid hex do SignalHire tra ve, con duong link chi nam o `uids` cua REQUEST.
+  // Dieu kien cu khong bao gio dung, nen `pasted_linkedin` la mot nhan CHET -
+  // da kiem tren DB that: 125 contact vao bang duong dan link deu dang mang
+  // nhan 'signalhire', va bang contact khong co lay mot dong pasted_linkedin
+  // nao. Phan giai thich "Wasted" tren /admin chi dich danh duong dan link la
+  // nguon hut credit chinh, trong khi cot do khong the nao sang len duoc.
+  //
+  // `doanTuLink` o tren KHONG thay the duoc cho nay: no doi them !brandName,
+  // nen chi dung cho 16 job dan link ma chua biet brand. 127 job dan link con
+  // lai deu da biet brand tu truoc.
+  const uidDaDan = new Set(uids.map(String).filter((u) => u.startsWith('http')));
+  const moiUidLaLink = uidDaDan.size > 0 && uidDaDan.size === uids.length;
+
   let saved = 0;
   if (brandRow?.id) {
     for (const person of out.people) {
@@ -226,7 +264,11 @@ export async function POST(req: NextRequest) {
         location: person.location,
         bio: person.bio,
         org_rank: rankOf(person.title ?? ''),
-        source: person.uid.startsWith('http') ? 'pasted_linkedin' : (isFree ? 'seed_verified' : 'signalhire'),
+        // `isFree` xet TRUOC: bo seed da xac minh tay thi luon la
+        // 'seed_verified', khong duoc de phong doan "dan link" ghi de len.
+        source: isFree
+          ? 'seed_verified'
+          : ((moiUidLaLink || uidDaDan.has(String(person.uid))) ? 'pasted_linkedin' : 'signalhire'),
         external_uid: person.uid || null,
         revealed_by: user.id,
       };
@@ -240,9 +282,30 @@ export async function POST(req: NextRequest) {
         dupId = data?.id ?? null;
       }
       if (!dupId) {
-        const { data } = await admin.from('contact').select('id')
-          .eq('brand_id', brandRow.id).eq('full_name', person.name).maybeSingle();
-        dupId = data?.id ?? null;
+        // So ten KHONG phan biet hoa thuong. `.eq()` phan biet, nen hai dong
+        // chi khac moi kieu viet hoa lot qua thanh hai contact: tren DB that
+        // brand Iunik dang giu ca "marketing iunik" lan "Marketing iUNIK",
+        // hai uid khac nhau, deu khong email khong phone.
+        //
+        // So TRONG BO NHO chu KHONG dung `.ilike()`. `_` va `%` la ky tu dai
+        // dien cua LIKE, va PostgREST nuot dau `\` nen khong escape duoc -
+        // da thu tren DB that: `ilike('_arketing iUNIK')` khop ca hai dong
+        // "Marketing iUNIK", con `ilike('\_arketing iUNIK')` cho ra y het.
+        // Bang contact dang co mot ten chua dau gach duoi, tuc reveal nguoi do
+        // co the khop nham mot nguoi khac cung brand va GHI DE len dong cua ho.
+        //
+        // Cung tranh luon `.maybeSingle()`: no nem loi khi brand da co san hai
+        // dong trung hoa thuong nhu Iunik, lam hong ca lan reveal.
+        const { data } = await admin.from('contact')
+          .select('id, full_name')
+          .eq('brand_id', brandRow.id)
+          .order('created_at', { ascending: true });
+        // Mot brand chi co vai chuc contact nen khong can phan trang o day.
+        const chuanTen = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
+        const can = chuanTen(person.name);
+        dupId = can
+          ? ((data ?? []).find((r: any) => chuanTen(r.full_name) === can)?.id ?? null)
+          : null;
       }
 
       const { data: rec, error: cErr } = dupId
@@ -264,6 +327,31 @@ export async function POST(req: NextRequest) {
     console.error('[reveal] khong tim thay brand sau khi upsert:', tenBrand);
   }
 
+  // --- Hoc alias tu contact vua luu ----------------------------------------
+  //
+  // Tren LinkedIn nguoi ta khai phap nhan chu quan chu khong khai brand truc
+  // thuoc, nen voi brand con thi tim thang bang ten brand tra ve 0 nguoi va
+  // duong hoc alias tu ket qua tim kiem khong co gi de hoc. Contact vua luu o
+  // tren thi co: `company` cua ho chinh la ten phap nhan can tim.
+  //
+  // Doc LAI ca brand chu khong chi dung `out.people` cua lan nay: mot lan dan
+  // link thuong chi mang ve mot nguoi, khong du dong thuan de ket luan gi.
+  //
+  // Khong duoc lam hong lan reveal neu buoc nay loi - contact da luu roi, hoc
+  // duoc hay khong la chuyen cua lan quet sau.
+  if (brandRow?.id && tenBrand) {
+    try {
+      const { data: dsContact } = await admin
+        .from('contact').select('company').eq('brand_id', brandRow.id);
+      await hocAliasTuContact({
+        brand: tenBrand,
+        tenCongTy: (dsContact ?? []).map((r: any) => r.company),
+      });
+    } catch (e: any) {
+      console.error('[reveal] khong hoc duoc alias tu contact:', e?.message ?? e);
+    }
+  }
+
   // --- Chot credit ---------------------------------------------------------
   // SignalHire chi tinh tien nguoi co email hoac phone. Nguoi chi co ten la
   // mien phi, nen chi dem nguoi co lien he that vao so tien phai chot.
@@ -272,11 +360,29 @@ export async function POST(req: NextRequest) {
   // Chi dem nguoi vua duoc TINH TIEN (uidsMoi) - nguoi da co contact tu truoc
   // van co the nam trong out.people (SignalHire lam moi du lieu cho ho), nhung
   // khong duoc gop vao so phai chot vi ho khong nam trong amount da dat cho.
+  //
+  // `uidsMoi.includes(p.uid)` KHONG dung duoc cho duong dan link: luc do
+  // `uids` chua mot URL, con `p.uid` la uid hex SignalHire tra ve, nen phep so
+  // luon sai va `billable` ra 0. Hau qua da do duoc tren DB that: 130 lan
+  // reveal bang duong dan link luu ve 125 contact, nhung credit_ledger chi chot
+  // 4 credit - 126 credit con lai bi tra lai voi ghi chu "nothing billable"
+  // trong khi SignalHire van tru tien that.
+  //
+  // Doi chieu so du xac nhan: so du tut 2000 ke tu moc, tru 1453 cua lan sut
+  // khong giai thich duoc hom 01/10 con 547 - khop voi 548 contact co email
+  // hoac phone, chu khong khop voi 504 credit so sach dang ghi. Tuc so sach
+  // dang thieu khoang 44 credit, dung bang phan cua duong dan link.
+  //
+  // Voi duong dan link thi moi nguoi tra ve deu la nguoi vua dat cho: bo loc
+  // `uidsMoi` o tren cung bo qua nhanh nay (xem ghi chu cho `uidsMoi`), nen
+  // khong co ai "da co tu truoc" de phai loai ra.
   const billable = out.people.filter(
-    (p) => uidsMoi.includes(p.uid)
+    (p) => (moiUidLaLink || uidsMoi.includes(p.uid))
       && ((p.email ?? '').trim() !== '' || (p.phone ?? '').trim() !== '')
   ).length;
-  if (amount > 0) await commitCredit(job.id, billable);
+  // Khong duoc chot nhieu hon so da dat cho: commitCredit chi ha xuong, khong
+  // nang len, nhung chan o day cho ro y.
+  if (amount > 0) await commitCredit(job.id, Math.min(billable, amount));
 
   await admin.from('job').update({
     status: 'done',

@@ -289,6 +289,115 @@ export async function loadSettings() {
  * duoc thang priority 0 (admin tu tay nhap, xem saveAlias). Con lai ghi
  * priority 2, tuc chi luu lam ho so, khong lan quyen ai ca.
  */
+/**
+ * So nguoi toi thieu phai cung khai mot ten thi ten do moi duoc coi la chu
+ * quan, VA ti le toi thieu tren tong so nguoi doc duoc ten cong ty.
+ *
+ * PHAI thoa CA HAI (`&&`). Ban cu la `n >= 2 || ti le >= 0.6`, va dau `||` do
+ * bien luat 60% thanh code chet: 2 nguoi tren 100 cung du ghi mot alias vinh
+ * vien. Hau qua do tren DB that - trong 202 alias tu hoc, luat cu giu CA 202,
+ * va 83 cai trong so do duoi muc nay:
+ *
+ *     3%   3/100   green finger    -> Hoa Linh Pharma
+ *     11%  4/35    nature s way    -> BEE MASTER OF LAS VEGAS INC
+ *     20%  7/35    kendamil        -> TRUONG VINH KY HIGH SCHOOL
+ *     30%  8/27    iunik           -> Iunik Travel        (iUNIK la my pham Han)
+ *
+ * Mot alias sai khong chi vo dung, no CHIEM LUON brand do: searchBrand() tim
+ * cong ty da mapped truoc, va he co du mot nguoi tra ve thi `gop.length > 0`
+ * cat duong tim lai theo ten brand. Brand do hong vinh vien cho den khi co
+ * nguoi sua tay.
+ *
+ * 3 va 50% la muc cat tren du lieu that: no loai het 83 cai tren ma van giu
+ * nguyen nhom sat nguong, von deu dung (sohaco -> Sohaco Group 51%, geleximco
+ * -> GELEXIMCO GROUP 51%, tempo -> PT Tempo Scan Pacific Tbk 57%).
+ *
+ * Co bo sot vai cai dung (ensure -> Abbott chi 13%, morinaga 20%), va day la
+ * danh doi CO Y: khong hoc duoc thi lan quet sau hoc lai, hoac nguoi them tay
+ * mot dong - con hoc nham thi khong co gi tu sua va brand chet am tham.
+ */
+const MIN_DONG_THUAN = 3;
+const TI_LE_DONG_THUAN = 0.5;
+
+/**
+ * Trong mot danh sach ten cong ty do chinh nguoi ta khai, ten nao chiem da so
+ * du manh de coi la chu quan that su cua brand.
+ *
+ * Tra ve null khi khong du dong thuan, hoac khi ten chiem da so chinh la ten
+ * brand (luc do khong co gi de hoc - alias chi ton tai de dich brand sang mot
+ * ten KHAC).
+ *
+ * Tach rieng va thuan de test duoc, va de hai duong hoc alias dung CHUNG mot
+ * phep quyet dinh: tu ket qua tim kiem (ghiAliasHocDuoc) va tu contact da luu
+ * (hocAliasTuContact). Hai ban sao cua luat nay se lech nhau ma khong co gi bao.
+ */
+export function chonTenChiem(
+  tenCongTy: (string | null | undefined)[],
+  khoaBrand: string,
+): { ten: string; n: number; tong: number } | null {
+  const dem = new Map<string, { ten: string; n: number }>();
+  let tong = 0;
+
+  for (const raw of tenCongTy) {
+    const ten = String(raw ?? '').trim();
+    const k = nameKey(ten);
+    if (!k) continue;          // khong co ten thi khong bo phieu duoc
+    tong += 1;
+    const cu = dem.get(k);
+    if (cu) cu.n += 1; else dem.set(k, { ten, n: 1 });
+  }
+
+  if (tong === 0) return null;
+
+  const dan = [...dem.values()].sort((a, b) => b.n - a.n)[0];
+  if (!dan) return null;
+  if (dan.n < MIN_DONG_THUAN) return null;
+  if (dan.n / tong < TI_LE_DONG_THUAN) return null;
+  if (nameKey(dan.ten) === khoaBrand) return null;
+
+  return { ten: dan.ten, n: dan.n, tong };
+}
+
+/**
+ * Hai ten cong ty co phai chi la BIEN THE CACH VIET cua nhau khong.
+ *
+ * "SNB Distribution" va "SNB Distribution LTD.,"; "Bristar" va "Bristar
+ * Group"; "The a2 Milk Company" va "The a2 Milk Company Limited". Ve mat tim
+ * kiem day la mot cong ty, nhung bang alias khoa theo (alias, employer) nen
+ * chung nam thanh HAI dong, va searchBrand() tim het moi cong ty da mapped -
+ * tuc moi dong thua an them mot den hai luot trong tran 300 brand/ngay cua ca
+ * team, de doi lay gan nhu cung mot danh sach nguoi. `tongTotal` cung cong
+ * don hai lan nen con so "N of M" tren man ket qua phong len.
+ *
+ * Tren DB that dang co 50 alias tro toi nhieu cong ty, phan lon la kieu nay.
+ */
+export function laBienTheTen(a: string, b: string): boolean {
+  const x = nameKey(a);
+  const y = nameKey(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  // Mot ben chua tron ben kia NHU MOT TU HOAN CHINH. So bang chuoi con tran se
+  // gop nham hai cong ty khac han: nameKey("Ensure") nam trong
+  // nameKey("Ensured Safety Ltd"). Them khoang trang hai dau de bien phep so
+  // chuoi con thanh phep so theo tu.
+  const bao = (s: string) => ` ${s} `;
+  return bao(x).includes(bao(y)) || bao(y).includes(bao(x));
+}
+
+/**
+ * Alias nay da co mot employer chi khac cach viet chua. Co thi khong ghi them
+ * dong moi - xem laBienTheTen().
+ *
+ * Doc loi thi coi nhu CHUA co: hoc thieu mot alias chi lam lan quet sau phai
+ * hoc lai, con chan nham thi mat han mot alias dung.
+ */
+async function daCoBienThe(khoaBrand: string, tenMoi: string): Promise<boolean> {
+  const { data, error } = await supabaseAdmin()
+    .from('brand_alias').select('employer').eq('alias', khoaBrand);
+  if (error) return false;
+  return (data ?? []).some((r: any) => laBienTheTen(String(r.employer ?? ''), tenMoi));
+}
+
 export async function ghiAliasHocDuoc(opts: {
   brand: string;
   candidates: Candidate[];
@@ -298,29 +407,17 @@ export async function ghiAliasHocDuoc(opts: {
   aliasCompany: string | null;
 }) {
   const khoaBrand = nameKey(opts.brand);
-  if (!khoaBrand || opts.candidates.length < 3) return null;
+  if (!khoaBrand) return null;
 
-  const dem = new Map<string, { ten: string; n: number }>();
-  for (const c of opts.candidates) {
-    const ten = String(c.company ?? '').trim();
-    const k = nameKey(ten);
-    if (!k) continue;
-    const cu = dem.get(k);
-    if (cu) cu.n += 1; else dem.set(k, { ten, n: 1 });
-  }
-
-  const xepHang = [...dem.values()].sort((a, b) => b.n - a.n);
-  const dan = xepHang[0];
+  const dan = chonTenChiem(opts.candidates.map((c) => c.company), khoaBrand);
   if (!dan) return null;
 
-  const duNhieu = dan.n >= 2 || dan.n / opts.candidates.length >= 0.6;
-  if (!duNhieu) return null;
-  if (nameKey(dan.ten) === khoaBrand) return null;
+  if (await daCoBienThe(khoaBrand, dan.ten)) return null;
 
   const note = opts.fellBack
     ? `Tu hoc ${new Date().toISOString().slice(0, 10)}: alias cu "${opts.aliasCompany ?? ''}" tra ve 0 nguoi, `
-      + `ten nay ra ${dan.n}/${opts.candidates.length} nguoi.`
-    : `Tu hoc ${new Date().toISOString().slice(0, 10)}: ${dan.n}/${opts.candidates.length} ket qua khai ten nay.`;
+      + `ten nay ra ${dan.n}/${dan.tong} nguoi.`
+    : `Tu hoc ${new Date().toISOString().slice(0, 10)}: ${dan.n}/${dan.tong} ket qua khai ten nay.`;
 
   const { error } = await supabaseAdmin().from('brand_alias').upsert(
     {
@@ -337,6 +434,61 @@ export async function ghiAliasHocDuoc(opts: {
   // Hong o day khong duoc lam ca lan quet that bai theo. Ket qua da co roi,
   // hoc them duoc hay khong chi la chuyen cua lan sau.
   if (error) { console.error('[alias] khong ghi duoc alias hoc duoc:', error.message); return null; }
+  return { alias: khoaBrand, employer: dan.ten, n: dan.n };
+}
+
+/**
+ * Hoc alias tu CONTACT DA LUU cua mot brand, thay vi tu ket qua tim kiem.
+ *
+ * Vi sao can duong nay. Tren LinkedIn nguoi ta khai phap nhan chu quan, khong
+ * khai brand truc thuoc: khong ai ghi minh lam o "Inochi", ho ghi "Tan Phu
+ * Plastic Joint Stock Company". Nen voi mot brand con, tim thang bang ten
+ * brand tra ve 0 nguoi - va ghiAliasHocDuoc() chi hoc duoc tu ket qua tim
+ * kiem, tuc khong co gi de hoc. Brand do ket o day cho den khi co nguoi go
+ * tay alias vao Admin.
+ *
+ * Contact da luu thi pha duoc the be tac do. PIC van lay duoc nguoi cua brand
+ * con bang cach dan link LinkedIn hoac nhap tay, va moi contact ay mang theo
+ * `company` - chinh la ten phap nhan dang can. Doc nguoc ra la co alias.
+ *
+ * Nguon nay TOT HON ket qua tim kiem: day la nguoi PIC da chon, da tra credit
+ * va da giu lai, khong phai 100 dong dau cua mot lan tim rong. Da kiem tren DB
+ * that: suy duoc dung "Inochi -> Tan Phu Plastic Joint Stock Company", va 21
+ * brand khac cho ra dung alias dang co san - tuc phep suy nay khop voi thuc te.
+ *
+ * Dung CHUNG nguong voi ghiAliasHocDuoc (chonTenChiem), va cung chan bien the
+ * cach viet nhu the.
+ *
+ * Ghi priority 2 giong nhanh hoc-lan-dau: thua alias nhap tay (0), de khi admin
+ * sua tay thi ban sua do thang - xem fix_alias_priority.sql.
+ */
+export async function hocAliasTuContact(opts: {
+  brand: string;
+  /** `company` cua tung contact dang co cua brand nay. */
+  tenCongTy: (string | null | undefined)[];
+}) {
+  const khoaBrand = nameKey(opts.brand);
+  if (!khoaBrand) return null;
+
+  const dan = chonTenChiem(opts.tenCongTy, khoaBrand);
+  if (!dan) return null;
+
+  if (await daCoBienThe(khoaBrand, dan.ten)) return null;
+
+  const { error } = await supabaseAdmin().from('brand_alias').upsert(
+    {
+      alias: khoaBrand,
+      employer: dan.ten,
+      relation: 'owner',
+      priority: 2,
+      note: `Tu hoc ${new Date().toISOString().slice(0, 10)} tu contact da luu: `
+        + `${dan.n}/${dan.tong} nguoi khai ten nay.`.slice(0, 300),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'alias,employer' },
+  );
+
+  if (error) { console.error('[alias] khong ghi duoc alias tu contact:', error.message); return null; }
   return { alias: khoaBrand, employer: dan.ten, n: dan.n };
 }
 
@@ -771,4 +923,60 @@ export async function revealUids(apikey: string, uids: string[]) {
   }
 
   return { ok: true as const, status: 200, message: '', people };
+}
+
+export type ApiKeyCheck =
+  | { ok: true; credits: number | null; unlimited: boolean }
+  | { ok: false; status: number; message: string };
+
+/**
+ * Xac minh mot key CO GOI DUOC SignalHire that su, khong chi dung hinh dang
+ * (do dai, khong khoang trang). Dung /credits vi day la endpoint nhe nhat -
+ * khong tinh vao "daily search attempts" (cai lam sap search/reveal) va khong
+ * tinh credit.
+ *
+ * Goi qua goiSignalHire() - CUNG hang doi 3-dong-thoi voi search/reveal, du
+ * day khong phai luot tim/reveal that. Truoc day UsagePanel.tsx tu fetch()
+ * thang, dung ngoai hang doi - mot lan kiem tra credit dung luc dang co scan
+ * chay se la request thu 4 dong thoi that su, vuot gioi han 3 cua tai khoan
+ * du moi ham tuong minh nghi minh dang o trong han muc rieng.
+ *
+ * Dung ham nay o CA HAI noi: setSignalhireKey() (actions.ts) truoc khi luu -
+ * de tu choi ngay mot key dan sai/thieu ky tu thay vi am tham luu roi chi lo
+ * ra qua mot lan scan that that bai (va lan scan do van tinh vao "daily search
+ * attempts" cua SignalHire nhu MOI lan goi khac) - va UsagePanel.tsx khi doc
+ * so du de hien thi.
+ */
+export async function checkApiKey(apikey: string): Promise<ApiKeyCheck> {
+  const key = apikey.trim();
+  if (!key) return { ok: false, status: 0, message: 'No key given.' };
+
+  let res: Response;
+  try {
+    res = await goiSignalHire(`${API}/credits`, { headers: { apikey: key } });
+  } catch (e: any) {
+    return { ok: false, status: 0, message: `Could not reach SignalHire: ${e?.message ?? 'network error'}` };
+  }
+
+  const header = res.headers.get('x-credits-left');
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    let msg = `SignalHire returned ${res.status}`;
+    try {
+      const parsed = JSON.parse(text);
+      msg = String(parsed?.error ?? parsed?.message ?? msg);
+    } catch { /* giu thong bao mac dinh */ }
+    return { ok: false, status: res.status, message: msg };
+  }
+
+  const body: any = await res.json().catch(() => ({}));
+  const raw = body?.credits ?? body?.creditsLeft ?? body?.balance ?? header;
+  const n = Number(raw);
+
+  // Goi Unlimited khong tra ve so huu han - xem ghi chu goc o UsagePanel.tsx.
+  if (raw == null || !Number.isFinite(n) || n < 0 || n > 1e8) {
+    return { ok: true, credits: null, unlimited: true };
+  }
+  return { ok: true, credits: n, unlimited: false };
 }

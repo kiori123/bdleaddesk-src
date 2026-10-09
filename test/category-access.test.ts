@@ -86,7 +86,13 @@ test("free scan request under user B's category -> the guard must run before Sig
 
   const src = readSource('../app/api/scan/route.ts');
   const idxCheck = src.indexOf('canUseCategory(db, user.id, categoryId)');
-  const idxSignalHireCall = src.indexOf('dsBrand.map((b: any) => searchBrand(');
+  // Dò CHINH LAN GOI `searchBrand({`, khong do cau lenh bao quanh no. Ban cu
+  // dò nguyen chuoi `dsBrand.map((b: any) => searchBrand(`, nen khi cach chay
+  // doi tu Promise.all sang chay theo tho (chayTheoTho, de chan han chot) thi
+  // test do bao "khong tim thay lan goi searchBrand" - trong khi thu tu no
+  // canh khong he doi. Bat bien can giu la THU TU, dung buoc cach viet.
+  // `searchBrand(` khong trung voi dong import, vi o do no la `searchBrand,`.
+  const idxSignalHireCall = src.indexOf('searchBrand({');
   const idxJobInsert = src.indexOf("kind: 'search', status: 'queued'");
 
   assert.ok(idxCheck > -1, 'khong tim thay canUseCategory(...) trong scan/route.ts');
