@@ -22,20 +22,99 @@
 export const CALLS_PER_COMPANY_WORST_CASE = 2;
 
 /**
- * Tran so brand moi lan goi /api/scan - KHONG phai han muc ngay, ma de dam
- * bao mot lan quet chac chan xong truoc maxDuration (60s).
+ * Tran so brand moi lan goi /api/scan - KHONG phai han muc ngay.
  *
- * 5, khong phai 8: voi gioi han 3 dong thoi that su cua SignalHire (xem
- * SO_DONG_THOI_TOI_DA o lib/signalhire.ts) va toi da CALLS_PER_COMPANY_WORST_CASE
- * lan goi moi brand, truong hop xau nhat la 5 * 2 = 10 lan goi, chia 3 dong
- * thoi = 4 dot. Doi chieu lich su that (job.created_at/updated_at cua cac lan
- * quet mot-brand-mot-lan-goi cu, doc truc tiep tu DB): trung binh 3.14s, cham
- * nhat quan sat duoc 14.93s moi lan goi. 4 dot * 14.93s ~ 60s - sat tran nhung
- * song duoc; 8 brand (16 lan goi / 3 = 6 dot) o muc cham nhat se ra ~90s,
- * chac chan qua maxDuration va bo lai mot job ket o status 'running' vinh vien
- * - hong hon nhieu so voi mot lo nho hon.
+ * 8, truoc day la 5. Con so 5 duoc chot bang mot phep nhan worst-case:
+ * 5 brand * 2 lan goi / 3 dong thoi = 4 dot, nhan voi 14.93s (lan goi cham
+ * nhat tung quan sat duoc) ~ 60s. Phep do chong hai cai te nhat doc lap len
+ * nhau - gia dinh MOI brand deu can 2 lan goi VA moi lan goi deu cham bang
+ * ky luc.
+ *
+ * Do lai tren 384 lan quet that (job.created_at -> updated_at, da loai job
+ * treo): moi brand p50 2.3s, p90 6.0s, p99 10.8s. Rieng 79 lan quet du 5
+ * brand: p50 4.8s, CHAM NHAT 32.8s. Tuc muc 5 dang dung chua toi mot nua
+ * ngan sach 60s. Va chi 25% brand that su can den lan goi thu hai, khong phai
+ * 100% nhu phep nhan kia gia dinh.
+ *
+ * Voi 8 brand o muc p99 cho MOI brand: 8 * 10.8 / 3 ~ 29s, van trong
+ * NGAN_SACH_TIM_MS. Nhung con so nay khong con phai la thu giu an toan nua -
+ * NGAN_SACH_TIM_MS moi la, va no chan theo DONG HO THAT chu khong theo uoc
+ * luong. Vuot gio thi brand chua chay roi vao `notRun`, khong con bo lai job
+ * ket o 'running' vinh vien.
  */
-export const MAX_BRAND_MOI_LAN = 5;
+export const MAX_BRAND_MOI_LAN = 8;
+
+/**
+ * Bao lau ke tu luc bat dau thi NGUNG nhan brand moi vao tim.
+ *
+ * Day moi la thu giu cho mot lan quet khong bao gio vuot maxDuration, chu
+ * khong phai MAX_BRAND_MOI_LAN. Brand nao chua kip bat dau khi qua moc nay se
+ * khong chay va duoc tra ve trong `notRun` - man ket qua da co san cho hien
+ * chung ("N brands were not searched at all"), va PIC quet lai mot lan nua.
+ *
+ * Co cai chan nay thi tran brand moi lan khong con phai la mot con so doan
+ * cho an toan: vuot gio thi xuong thang em, khong con bo lai mot job ket o
+ * 'running' vinh vien nhu truoc.
+ *
+ * 40 giay tren ngan sach 60: phan con lai danh cho cham diem, ghi
+ * scan_candidate, cap nhat job va tra ve. Nhung viec do chay sau khi tim xong
+ * va khong duoc tinh vao day.
+ */
+export const NGAN_SACH_TIM_MS = 40_000;
+
+/**
+ * So brand chay song song. Bang dung gioi han 3 dong thoi that su cua tai
+ * khoan SignalHire (SO_DONG_THOI_TOI_DA trong lib/signalhire.ts), nen khong
+ * mat thong luong so voi cach cu la bung het mot luot roi de hang doi ben
+ * trong tu chen.
+ *
+ * Doi sang chay theo tho CO LY DO: `Promise.all(dsBrand.map(...))` goi het
+ * cac ham ngay lap tuc, nen moi phep kiem gio deu chay o giay 0 va khong chan
+ * duoc gi. Chay theo tho thi moi tho kiem gio TRUOC khi nhan brand tiep theo,
+ * tuc moc gio o tren moi co tac dung that.
+ */
+export const SO_BRAND_SONG_SONG = 3;
+
+/**
+ * Chay mot danh sach viec bang `soTho` tho song song, va NGUNG NHAN viec moi
+ * khi qua `hanChot`.
+ *
+ * Viec da bat dau thi chay cho xong, khong cat ngang: voi mot lan tim brand,
+ * cat giua chung se vut di nhung lan goi SignalHire da tieu luot trong tran
+ * ngay roi.
+ *
+ * Vi sao phai la tho chu khong phai `Promise.all(ds.map(...))`: cach kia goi
+ * het cac ham NGAY LAP TUC, nen moi phep kiem gio dat o dau ham deu chay o
+ * giay 0 va khong bao gio dung duoc gi. Tho thi kiem gio TRUOC moi lan nhan
+ * viec tiep theo, tuc han chot moi co tac dung that.
+ *
+ * `now` de test tiem dong ho gia vao - han chot la thu khong the kiem bang
+ * cach ngoi doi that.
+ */
+export async function chayTheoTho<T, R>(
+  dsViec: T[],
+  lam: (viec: T) => Promise<R>,
+  opts: { hanChot: number; soTho: number; now?: () => number },
+): Promise<{ xong: R[]; quaGio: T[] }> {
+  const now = opts.now ?? Date.now;
+  const hangDoi = [...dsViec];
+  const xong: R[] = [];
+  const quaGio: T[] = [];
+
+  async function tho() {
+    for (;;) {
+      const viec = hangDoi.shift();
+      if (viec === undefined) return;
+      if (now() > opts.hanChot) { quaGio.push(viec); continue; }
+      xong.push(await lam(viec));
+    }
+  }
+
+  const soTho = Math.max(1, Math.min(opts.soTho, dsViec.length));
+  await Promise.all(Array.from({ length: soTho }, () => tho()));
+
+  return { xong, quaGio };
+}
 
 /**
  * Tran so nguoi HIEN RA cho moi brand tren man ket qua scan.

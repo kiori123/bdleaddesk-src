@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { catTheoBrand, MAX_PROFILE_MOI_BRAND } from '../lib/scanLimits';
+import { catTheoBrand, chayTheoTho, MAX_PROFILE_MOI_BRAND } from '../lib/scanLimits';
 
 // Phep cat nay giau 59% so dong scan_candidate tren du lieu that (11.071 /
 // 18.716). Sai mot cai la PIC mat nguoi ma khong co gi bao, nen no duoc test
@@ -100,4 +100,93 @@ test('tran mac dinh la MAX_PROFILE_MOI_BRAND, va dang la 20', () => {
   assert.equal(MAX_PROFILE_MOI_BRAND, 20);
   const { hien } = catTheoBrand(nhom('A', 50));
   assert.equal(hien.length, MAX_PROFILE_MOI_BRAND);
+});
+
+// --- chayTheoTho: han chot cho mot lan quet ---------------------------------
+//
+// Truoc day scan bung het brand bang Promise.all roi de hang doi 3-dong-thoi
+// ben trong tu chen. Vuot maxDuration (60s) la job ket o 'running' VINH VIEN,
+// khong ai biet vi sao. Cai chan nay bien no thanh xuong thang em: brand chua
+// kip bat dau roi vao `notRun`, man ket qua noi ro, PIC quet lai.
+
+/** Dong ho gia: chi nhich khi minh bao nhich. */
+function dongHo(batDau = 0) {
+  let t = batDau;
+  return { now: () => t, nhich: (ms: number) => { t += ms; } };
+}
+
+test('chua qua han thi lam het moi viec', async () => {
+  const dh = dongHo();
+  const r = await chayTheoTho([1, 2, 3, 4, 5], async (n) => n * 2,
+    { hanChot: 1000, soTho: 3, now: dh.now });
+  assert.deepEqual(r.xong.sort((a, b) => a - b), [2, 4, 6, 8, 10]);
+  assert.deepEqual(r.quaGio, []);
+});
+
+test('qua han giua chung: viec con lai vao quaGio, khong mat cai nao', async () => {
+  const dh = dongHo();
+  const r = await chayTheoTho([1, 2, 3, 4, 5, 6], async (n) => {
+    dh.nhich(400);          // moi viec ton 400ms theo dong ho gia
+    return n;
+  }, { hanChot: 1000, soTho: 1, now: dh.now });
+
+  // Tong so vao luon bang tong so ra: khong duoc nuot brand nao.
+  assert.equal(r.xong.length + r.quaGio.length, 6);
+  assert.ok(r.xong.length > 0, 'phai lam duoc it nhat mot viec truoc khi het gio');
+  assert.ok(r.quaGio.length > 0, 'phai bo lai phan chua kip');
+  // Thu tu giu nguyen: phan lam duoc la phan dau danh sach.
+  assert.deepEqual([...r.xong, ...r.quaGio], [1, 2, 3, 4, 5, 6]);
+});
+
+test('da qua han ngay tu dau thi khong goi SignalHire lan nao', async () => {
+  // Quan trong: moi lan goi an mot luot trong tran 300 brand/ngay cua ca team.
+  const dh = dongHo(5000);
+  let soLanGoi = 0;
+  const r = await chayTheoTho([1, 2, 3], async (n) => { soLanGoi++; return n; },
+    { hanChot: 1000, soTho: 3, now: dh.now });
+  assert.equal(soLanGoi, 0);
+  assert.deepEqual(r.xong, []);
+  assert.deepEqual(r.quaGio, [1, 2, 3]);
+});
+
+test('viec DA bat dau duoc chay cho xong, khong cat ngang', async () => {
+  // Cat giua chung se vut di mot lan goi SignalHire da tieu luot roi.
+  const dh = dongHo();
+  let xongHan = false;
+  const r = await chayTheoTho([1], async () => {
+    dh.nhich(10_000);       // chay qua han chot
+    xongHan = true;
+    return 'xong';
+  }, { hanChot: 1000, soTho: 3, now: dh.now });
+  assert.equal(xongHan, true);
+  assert.deepEqual(r.xong, ['xong']);
+  assert.deepEqual(r.quaGio, []);
+});
+
+test('so tho khong vuot so viec, va khong bao gio bang 0', async () => {
+  // soTho = 0 se tao ra khong tho nao va treo vinh vien.
+  const r = await chayTheoTho([1, 2], async (n) => n, { hanChot: Number.MAX_SAFE_INTEGER, soTho: 0 });
+  assert.deepEqual(r.xong.sort(), [1, 2]);
+  const rong = await chayTheoTho([], async (n) => n, { hanChot: Number.MAX_SAFE_INTEGER, soTho: 3 });
+  assert.deepEqual(rong.xong, []);
+  assert.deepEqual(rong.quaGio, []);
+});
+
+test('nhieu tho chay that su song song, khong noi duoi nhau', async () => {
+  let dangChay = 0, dinhCao = 0;
+  await chayTheoTho([1, 2, 3, 4, 5, 6], async (n) => {
+    dangChay++; dinhCao = Math.max(dinhCao, dangChay);
+    await new Promise((r) => setTimeout(r, 5));
+    dangChay--; return n;
+  }, { hanChot: Number.MAX_SAFE_INTEGER, soTho: 3 });
+  assert.equal(dinhCao, 3, 'phai co dung 3 viec chay cung luc');
+});
+
+test('mot viec nem loi thi loi noi ra, khong nuot', async () => {
+  // Nuot loi o day la bao "quet xong" trong khi mot brand that bai.
+  await assert.rejects(
+    () => chayTheoTho([1, 2], async (n) => { if (n === 2) throw new Error('SignalHire 429'); return n; },
+      { hanChot: Number.MAX_SAFE_INTEGER, soTho: 2 }),
+    /SignalHire 429/,
+  );
 });
