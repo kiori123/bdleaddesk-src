@@ -4,10 +4,10 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { nameKey } from '@/lib/nameKey';
 import { loadSettings, searchBrand } from '@/lib/signalhire';
-import { CALLS_PER_COMPANY_WORST_CASE } from '@/lib/scanLimits';
+import { canUseCategory } from '@/lib/credit';
 import { khopVung, vungCoChiaDuoc, xepTrongVungLenTruoc } from '@/lib/rank';
 import { timVung } from '@/lib/regions';
-import { catTheoBrand } from '@/lib/scanLimits';
+import { catTheoBrand, CALLS_PER_COMPANY_WORST_CASE } from '@/lib/scanLimits';
 
 export type Cand = {
   id: string;
@@ -208,7 +208,11 @@ export async function pollJob(jobId: string): Promise<JobView | null> {
  * priority 0 (nhap tay) de no thang moi dong tu hoc, giong saveAlias() ben
  * admin - xem fix_alias_priority.sql.
  */
-export async function thuTenPhapNhan(brand: string, employer: string): Promise<
+export async function thuTenPhapNhan(
+  brand: string,
+  employer: string,
+  categoryId: string | null,
+): Promise<
   { ok: true; soNguoi: number; daLuu: boolean } | { ok: false; error: string }
 > {
   const db = await supabaseServer();
@@ -229,6 +233,14 @@ export async function thuTenPhapNhan(brand: string, employer: string): Promise<
 
   // Tran ngay cua SignalHire, dung chung ca team. Mot lan thu cung la mot luot
   // that, nen phai hoi truoc va ghi lai sau - xem CLAUDE.md.
+  // categoryId den tu client, va lan thu nay tieu mot luot trong tran 300
+  // brand/ngay DUNG CHUNG ca team. Khong kiem thi mot PIC co the dam vao tran
+  // do duoi nhan mot category khong phai cua ho - dung bat bien ma /api/scan
+  // da chan, nen cho nay phai chan y het.
+  if (categoryId && !(await canUseCategory(db, user.id, categoryId))) {
+    return { ok: false, error: "That category isn't yours." };
+  }
+
   const { data: quota, error: quotaErr } = await db.rpc('my_quota');
   if (quotaErr || !quota || typeof quota.dang_khoa !== 'boolean') {
     return { ok: false, error: 'Could not check the daily search limit right now. Nothing was searched.' };
@@ -258,8 +270,13 @@ export async function thuTenPhapNhan(brand: string, employer: string): Promise<
     keywords: '',
   });
 
+  // category_id: MOI dong search_usage dang co deu mang gia tri nay (417/417),
+  // nen ghi null vao day se la dong duy nhat lech khoi ca bang va lam moi bao
+  // cao gom theo nganh bo sot no. Man ket qua da cam san categoryId cua chinh
+  // lan quet do.
   const { error: usageErr } = await admin.from('search_usage').insert({
     profile_id: user.id,
+    category_id: categoryId,
     brands: r.calls,
     profiles: r.candidates.length,
   });

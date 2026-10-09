@@ -82,7 +82,7 @@ function ThongKe({ s }: { s: BrandStat | undefined }) {
  * Khong luu mu: server xac minh bang mot lan goi SignalHire that, chi luu khi
  * co nguoi that o ten do, va bao lai ngay tai cho (xem thuTenPhapNhan).
  */
-function ThuTen({ brand }: { brand: string }) {
+function ThuTen({ brand, categoryId }: { brand: string; categoryId: string | null }) {
   const [ten, setTen] = useState('');
   const [dangChay, setDangChay] = useState(false);
   const [ketQua, setKetQua] = useState<{ ok: boolean; chu: string } | null>(null);
@@ -91,7 +91,7 @@ function ThuTen({ brand }: { brand: string }) {
     if (!ten.trim() || dangChay) return;
     setDangChay(true); setKetQua(null);
     try {
-      const r = await thuTenPhapNhan(brand, ten);
+      const r = await thuTenPhapNhan(brand, ten, categoryId);
       if (!r.ok) setKetQua({ ok: false, chu: r.error });
       else if (r.daLuu) {
         setKetQua({
@@ -449,7 +449,7 @@ export default function Results({
             the brand, not the brand, so the owner&rsquo;s name is what to try.
           </p>
         )}
-        {khongThay.map((s) => <ThuTen key={s.brand} brand={s.brand} />)}
+        {khongThay.map((s) => <ThuTen key={s.brand} brand={s.brand} categoryId={categoryId} />)}
         {locHet.length > 0 && (
           <p className="mt-2 max-w-[62ch] text-[13px] leading-relaxed text-ink-dim">
             <b className="text-ink">
