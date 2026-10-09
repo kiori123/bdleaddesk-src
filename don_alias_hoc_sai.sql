@@ -211,6 +211,18 @@ order by a.alias;
 --   from brand_alias b
 --   where (b.alias, b.employer) in (select alias, employer from yeu);
 --
+--   -- Bang nam trong schema `public` nen PostgREST tu phoi no ra API. Bat RLS
+--   -- ma KHONG them policy nao = fail-closed: anon va user thuong doc ra rong,
+--   -- service role va SQL Editor van doc binh thuong. Dung cach `app_setting`
+--   -- dang dung.
+--   --
+--   -- KHONG bat chuoc `brand_alias`: da kiem bang anon key (key nay nam trong
+--   -- bundle trinh duyet), brand_alias / brand / category / quota_config /
+--   -- search_usage deu doc duoc khong can dang nhap. Rieng contact,
+--   -- credit_ledger, credit_snapshot, scan_candidate, job, profile va
+--   -- app_setting thi da duoc chan dung.
+--   alter table brand_alias_da_xoa_20261009 enable row level security;
+--
 --   with yeu as (
 --     select
 --       alias,
