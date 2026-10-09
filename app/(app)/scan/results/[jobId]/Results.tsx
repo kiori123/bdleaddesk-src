@@ -22,7 +22,7 @@ function fmt(ms: number) {
 }
 
 /**
- * "28 of 1020 shown" - de PIC phan biet ba tinh huong khac han nhau: khong
+ * "28 of 1020 found" - de PIC phan biet ba tinh huong khac han nhau: khong
  * co trong SignalHire, cong ty nho da lay het, hay cong ty lon bi loc o
  * nguon. Khong noi ra thi mot danh sach ngan trong ba ly do do trong giong
  * y het nhau, va PIC de nham "khong co trong SignalHire" thanh "brand nay
@@ -49,7 +49,7 @@ function ThongKe({ s }: { s: BrandStat | undefined }) {
   if (s.outcome === 'narrowed' && s.filterSkipped) {
     return (
       <span className="text-[11.5px] text-red">
-        {s.found} people shown but <b>not filtered</b>
+        {s.found} people found but <b>not filtered</b>
         {s.total != null ? ` (this company has ${s.total})` : ''} &mdash; the region and
         seniority filter did not run, so these are the first people in the index anywhere in
         the world, not just where you asked. Search this brand again; if it keeps happening,
@@ -60,13 +60,13 @@ function ThongKe({ s }: { s: BrandStat | undefined }) {
   if (s.outcome === 'narrowed' && s.total != null) {
     return (
       <span className="text-[11.5px] text-ink-faint">
-        {s.found} of {s.total} shown, narrowed at the source because the company is large.
+        {s.found} of {s.total} found, narrowed at the source because the company is large.
       </span>
     );
   }
   return (
     <span className="text-[11.5px] text-ink-faint">
-      {s.found} shown, everyone in SignalHire&rsquo;s index for this company.
+      {s.found} found, everyone in SignalHire&rsquo;s index for this company.
     </span>
   );
 }
@@ -430,7 +430,17 @@ export default function Results({
         <div key={brand} className="mb-7">
           <div className="mb-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-1 border-b border-line pb-1.5">
             <span className="font-display text-sm uppercase tracking-wide text-teal-deep">{brand}</span>
-            <span className="text-[11px] font-semibold text-ink-faint">{list.length}</span>
+            {/*
+              Khi bi cat thi PHAI hien ca hai so. Mot danh sach dung 20 nguoi
+              khong kem con so tong doc het suc giong mot brand chi co 20
+              nguoi - dung cai nham lan ma ThongKe ben tren da duoc viet ra de
+              tranh. Tren du lieu that, 42% nhom brand co hon 20 nguoi.
+            */}
+            <span className="text-[11px] font-semibold text-ink-faint">
+              {(view.tongTheoBrand[brand] ?? list.length) > list.length
+                ? `top ${list.length} of ${view.tongTheoBrand[brand]}`
+                : list.length}
+            </span>
             <ThongKe s={statsByBrand.get(brand)} />
           </div>
 

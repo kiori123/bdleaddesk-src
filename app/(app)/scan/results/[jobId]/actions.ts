@@ -3,6 +3,7 @@
 import { supabaseServer } from '@/lib/supabase/server';
 import { khopVung, vungCoChiaDuoc, xepTrongVungLenTruoc } from '@/lib/rank';
 import { timVung } from '@/lib/regions';
+import { catTheoBrand } from '@/lib/scanLimits';
 
 export type Cand = {
   id: string;
@@ -29,7 +30,7 @@ export type Cand = {
 };
 
 /**
- * "28 of 1020 shown" hay "Not found in SignalHire" - xem BrandResult.total /
+ * "28 of 1020 found" hay "Not found in SignalHire" - xem BrandResult.total /
  * .outcome o lib/signalhire.ts. total null nghia la khong biet (loi mang).
  */
 export type BrandStat = {
@@ -56,7 +57,20 @@ export type JobView = {
   fellBack: { brand: string; from: string; to: string }[];
   /** Brand vuot qua tran moi lan quet nen chua chay. */
   notRun: string[];
+  /**
+   * Nguoi DUOC HIEN, da cat con toi da MAX_PROFILE_MOI_BRAND moi brand.
+   *
+   * Man hinh khong bao gio cam danh sach day du, va day la co y: nut lay
+   * contact chi chon duoc trong so nay, nen khong the lo tieu credit cho mot
+   * nguoi PIC chua nhin thay.
+   */
   candidates: Cand[];
+  /**
+   * So nguoi THAT SU co cho moi brand, TRUOC khi cat. Man hinh doi chieu voi
+   * so dong thuc hien de noi "20 of 63" - khong co no thi mot danh sach dung
+   * 20 nguoi doc giong het mot brand chi co 20 nguoi.
+   */
+  tongTheoBrand: Record<string, number>;
   /** total/outcome tung brand - xem BrandStat. */
   brandStats: BrandStat[];
   /**
@@ -139,6 +153,17 @@ export async function pollJob(jobId: string): Promise<JobView | null> {
 
   const dsXep = xepTrongVungLenTruoc(dsCand);
 
+  /**
+   * Cat con MAX_PROFILE_MOI_BRAND nguoi moi brand.
+   *
+   * Cat o DAY, sau xepTrongVungLenTruoc, chu khong phai bang `.limit()` tren
+   * truy van: thu tu cuoi cung la trong-vung-truoc roi moi den diem, va thu
+   * tu do chi co sau khi doc xong `job.payload.location`. Cat o truy van se
+   * giu 20 nguoi diem cao nhat KE CA khi ho deu nam ngoai vung PIC chon, tuc
+   * dung thu tu cu va sai thu tu man hinh.
+   */
+  const { hien: dsHien, tongTheoBrand } = catTheoBrand(dsXep);
+
   return {
     status: job.status,
     error: job.error,
@@ -148,6 +173,7 @@ export async function pollJob(jobId: string): Promise<JobView | null> {
     notRun: Array.isArray(ketQua.notRun) ? ketQua.notRun.map(String) : [],
     brandStats,
     regionLabel: chiaDuoc && vung ? (timVung(vung)?.label ?? null) : null,
-    candidates: dsXep,
+    candidates: dsHien,
+    tongTheoBrand,
   };
 }
