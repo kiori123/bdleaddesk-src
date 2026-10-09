@@ -71,6 +71,34 @@
 --     (priority 0 - xem fix_alias_priority.sql).
 
 -- ---------------------------------------------------------------------------
+-- VI SAO CHI XOA THEO TI LE, KHONG XOA THEO SO NGUOI
+-- ---------------------------------------------------------------------------
+--
+-- Nguong trong code la "it nhat 3 nguoi VA it nhat 50%". File nay CHI dung ve
+-- 50%, co y, va hai cho khac nhau vi hai viec khac nhau:
+--
+--   - Code quyet dinh mot minh, cho tuong lai, khong ai nhin lai. O do phai
+--     chat: hoc tu 2 nguoi chinh la thu gay ra ca mo nay.
+--   - Don dep thi co mat nguoi. Bay dong rot vi CHI co 2 nguoi dong y nhung ti
+--     le van tren 50%, va nhin qua thi deu dung hoac rat co ly - phan lon chi
+--     la ten phap nhan day du cua chinh brand do:
+--
+--       67%  2/3   supersports vietnam        -> CRC Sports (Supersports)
+--       50%  2/4   binh tien consumer goods   -> BINH TIEN ... LIMITED COMPANY
+--       50%  2/4   wir group                  -> WIR GROUP COMPANY LIMITED
+--       50%  2/4   clinique                   -> Estee Lauder Vietnam
+--       67%  2/3   brauer                     -> Thasco International
+--       50%  2/4   cofier                     -> COFIER Soluciones
+--       50%  2/4   posy                       -> Posy Space
+--
+-- Xoa chung di la mat 7 alias dung va day them 7 brand ve tay khong, doi lay
+-- khong gi ca. Nen file nay giu lai, va ai do nhin 7 dong tren roi tu quyet.
+--
+-- Doi lai: 78 dong con lai deu duoi 50% dong thuan. Trong so do VAN co vai cai
+-- dung (kinh do -> Mondelez Kinh Do o 24% la that), nhung o muc dong thuan do
+-- thi khong co co so nao de giu tu dong - them tay lai la viec mot phut.
+
+-- ---------------------------------------------------------------------------
 -- PHAN 1 - CHI DOC. Xem truoc chinh xac cai gi se bi xoa.
 -- ---------------------------------------------------------------------------
 
@@ -94,7 +122,7 @@
 -- thoa - tuc dong do KHONG bi xoa. Huong an toan: bo sot mot dong rac con hon
 -- xoa nham mot alias dung.
 
--- 1a. Dem nhanh. Nen ra 85 va 65.
+-- 1a. Dem nhanh. Nen ra 78 va 58.
 with yeu as (
   select
     alias,
@@ -105,11 +133,8 @@ with yeu as (
   from brand_alias
   where note like 'Tu hoc%'
     and substring(note from '(\d+)/\d+ (?:ket qua|nguoi)') is not null
-    and (
-      substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int < 3
-      or 1.0 * substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int
-             / nullif(substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int, 0) < 0.5
-    )
+    and 1.0 * substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int
+            / nullif(substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int, 0) < 0.5
 )
 select
   (select count(*) from yeu) as se_xoa,
@@ -131,11 +156,8 @@ with yeu as (
   from brand_alias
   where note like 'Tu hoc%'
     and substring(note from '(\d+)/\d+ (?:ket qua|nguoi)') is not null
-    and (
-      substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int < 3
-      or 1.0 * substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int
-             / nullif(substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int, 0) < 0.5
-    )
+    and 1.0 * substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int
+            / nullif(substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int, 0) < 0.5
 )
 select
   round(100.0 * nguoi_dong_y / nullif(tong_nguoi, 0)) as phan_tram,
@@ -155,11 +177,8 @@ with yeu as (
   from brand_alias
   where note like 'Tu hoc%'
     and substring(note from '(\d+)/\d+ (?:ket qua|nguoi)') is not null
-    and (
-      substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int < 3
-      or 1.0 * substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int
-             / nullif(substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int, 0) < 0.5
-    )
+    and 1.0 * substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int
+            / nullif(substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int, 0) < 0.5
 )
 select a.alias, count(*) as so_dong_hien_co
 from brand_alias a
@@ -185,11 +204,8 @@ order by a.alias;
 --     from brand_alias
 --     where note like 'Tu hoc%'
 --       and substring(note from '(\d+)/\d+ (?:ket qua|nguoi)') is not null
---       and (
---         substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int < 3
---         or 1.0 * substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int
---                / nullif(substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int, 0) < 0.5
---       )
+--       and 1.0 * substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int
+--               / nullif(substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int, 0) < 0.5
 --   )
 --   select b.*, now() as xoa_luc
 --   from brand_alias b
@@ -205,16 +221,13 @@ order by a.alias;
 --     from brand_alias
 --     where note like 'Tu hoc%'
 --       and substring(note from '(\d+)/\d+ (?:ket qua|nguoi)') is not null
---       and (
---         substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int < 3
---         or 1.0 * substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int
---                / nullif(substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int, 0) < 0.5
---       )
+--       and 1.0 * substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int
+--               / nullif(substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int, 0) < 0.5
 --   )
 --   delete from brand_alias b
 --   where (b.alias, b.employer) in (select alias, employer from yeu);
 --
---   -- Phai ra 85. Khac nhieu thi dung commit, roll back va xem lai Phan 1.
+--   -- Phai ra 78. Khac nhieu thi dung commit, roll back va xem lai Phan 1.
 --   select count(*) as da_xoa from brand_alias_da_xoa_20261009;
 -- commit;
 
