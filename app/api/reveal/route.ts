@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { reserveCredit, releaseCredit, commitCredit, canUseCategory } from '@/lib/credit';
 import { nameKey } from '@/lib/nameKey';
 import { khoaLinkedin } from '@/lib/contactIdentity';
-import { loadSettings, revealUids } from '@/lib/signalhire';
+import { loadSettings, revealUids, hocAliasTuContact } from '@/lib/signalhire';
 import { rankOf } from '@/lib/orgRank';
 import { baoChoNguoi } from '@/lib/notify';
 
@@ -325,6 +325,31 @@ export async function POST(req: NextRequest) {
     }
   } else {
     console.error('[reveal] khong tim thay brand sau khi upsert:', tenBrand);
+  }
+
+  // --- Hoc alias tu contact vua luu ----------------------------------------
+  //
+  // Tren LinkedIn nguoi ta khai phap nhan chu quan chu khong khai brand truc
+  // thuoc, nen voi brand con thi tim thang bang ten brand tra ve 0 nguoi va
+  // duong hoc alias tu ket qua tim kiem khong co gi de hoc. Contact vua luu o
+  // tren thi co: `company` cua ho chinh la ten phap nhan can tim.
+  //
+  // Doc LAI ca brand chu khong chi dung `out.people` cua lan nay: mot lan dan
+  // link thuong chi mang ve mot nguoi, khong du dong thuan de ket luan gi.
+  //
+  // Khong duoc lam hong lan reveal neu buoc nay loi - contact da luu roi, hoc
+  // duoc hay khong la chuyen cua lan quet sau.
+  if (brandRow?.id && tenBrand) {
+    try {
+      const { data: dsContact } = await admin
+        .from('contact').select('company').eq('brand_id', brandRow.id);
+      await hocAliasTuContact({
+        brand: tenBrand,
+        tenCongTy: (dsContact ?? []).map((r: any) => r.company),
+      });
+    } catch (e: any) {
+      console.error('[reveal] khong hoc duoc alias tu contact:', e?.message ?? e);
+    }
   }
 
   // --- Chot credit ---------------------------------------------------------

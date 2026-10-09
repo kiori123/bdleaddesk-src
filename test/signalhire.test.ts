@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { revealUids, searchBrand, gomAliasTheoUuTien } from '../lib/signalhire';
+import {
+  revealUids, searchBrand, gomAliasTheoUuTien, chonTenChiem, laBienTheTen,
+} from '../lib/signalhire';
 import { nameKey } from '../lib/nameKey';
 
 // --- 1a: mot loi mang trong revealUids khong duoc nem ra ngoai -------------
@@ -448,4 +450,103 @@ test('searchBrand: the same person returned by two mapped employers is not dupli
   } finally {
     global.fetch = real;
   }
+});
+
+// --- hoc alias: nguong dong thuan ------------------------------------------
+//
+// Luat cu la `n >= 2 || ti le >= 0.6`. Dau `||` bien ve 60% thanh code chet:
+// hai nguoi tren mot tram cung du ghi mot alias vinh vien. Do tren DB that,
+// luat cu giu CA 202 alias tu hoc, trong do 83 cai duoi 50% dong thuan va
+// nhieu cai sai han (kendamil -> TRUONG VINH KY HIGH SCHOOL o 7/35).
+//
+// Mot alias sai khong chi vo dung ma CHIEM luon brand: searchBrand() tim cong
+// ty da mapped truoc, he co mot nguoi tra ve la duong tim lai theo ten brand
+// bi cat. Nen nguong nay phai that chat.
+
+const ten = (n: number, t: string) => Array.from({ length: n }, () => t);
+
+test('chonTenChiem: 3 nguoi tren 100 KHONG du de hoc', () => {
+  // Chinh la "green finger -> Hoa Linh Pharma" (3/100) tren DB that: ba nguoi
+  // dong y, chin muoi bay nguoi con lai moi nguoi mot ten. Luat cu ghi alias
+  // nay that, va no chiem luon brand Green Finger ke tu do.
+  const ds = [...ten(3, 'Hoa Linh Pharma'), ...Array.from({ length: 97 }, (_, i) => `Cty ${i}`)];
+  assert.equal(chonTenChiem(ds, 'green finger'), null);
+});
+
+test('chonTenChiem: duoi 50% thi tu choi du so tuyet doi lon', () => {
+  // "bni -> BNI Sekuritas" (20/100) tren DB that.
+  const ds = [...ten(20, 'BNI Sekuritas'), ...Array.from({ length: 80 }, (_, i) => `Cty ${i}`)];
+  assert.equal(chonTenChiem(ds, 'bni'), null);
+});
+
+test('chonTenChiem: duoi 3 nguoi thi tu choi du dat 100%', () => {
+  // Hai nguoi cung khai mot ten chua noi len dieu gi, ke ca khi ho la tat ca.
+  assert.equal(chonTenChiem(ten(2, 'Estee Lauder Vietnam'), 'clinique'), null);
+});
+
+test('chonTenChiem: dat ca hai dieu kien thi hoc', () => {
+  // "sohaco -> Sohaco Group" (48/95 = 51%) tren DB that, nhom sat nguong va
+  // dung - phai duoc giu.
+  const ds = [...ten(48, 'Sohaco Group'), ...Array.from({ length: 47 }, (_, i) => `Cty ${i}`)];
+  const r = chonTenChiem(ds, 'sohaco');
+  assert.equal(r?.ten, 'Sohaco Group');
+  assert.equal(r?.n, 48);
+  assert.equal(r?.tong, 95);
+});
+
+test('chonTenChiem: ten chiem da so TRUNG ten brand thi khong hoc', () => {
+  // Alias chi ton tai de dich brand sang mot ten KHAC. Ghi "heineken ->
+  // heineken" la mot dong vo nghia an them mot luot goi moi lan quet.
+  assert.equal(chonTenChiem(ten(10, 'Heineken'), nameKey('Heineken')), null);
+});
+
+test('chonTenChiem: nguoi khong khai cong ty khong duoc tinh vao mau so', () => {
+  // Ba nguoi khai ten, bay nguoi de trong -> 3/3, khong phai 3/10. Tinh ca
+  // dong rong vao mau so se lam ti le tut xuong va bo sot alias dung.
+  const ds = [...ten(3, 'Masan Consumer Holdings'), null, undefined, '', '   ', null, null, ''];
+  const r = chonTenChiem(ds, 'chin su');
+  assert.equal(r?.n, 3);
+  assert.equal(r?.tong, 3);
+});
+
+test('chonTenChiem: danh sach rong tra ve null, khong vo', () => {
+  assert.equal(chonTenChiem([], 'abc'), null);
+  assert.equal(chonTenChiem([null, '', '  '], 'abc'), null);
+});
+
+test('chonTenChiem: khac hoa thuong / dau cau van tinh la mot ten', () => {
+  const ds = ['Sohaco Group', 'SOHACO GROUP', 'sohaco  group'];
+  const r = chonTenChiem(ds, 'sohaco');
+  assert.equal(r?.n, 3);
+});
+
+// --- hoc alias: chan bien the cach viet ------------------------------------
+
+test('laBienTheTen: hau to phap nhan khong tao ra mot cong ty moi', () => {
+  // Tren DB that dang co 50 alias tro toi nhieu cong ty, phan lon kieu nay.
+  // Moi dong thua an them mot den hai luot trong tran 300 brand/ngay.
+  assert.equal(laBienTheTen('SNB Distribution', 'SNB Distribution LTD.,'), true);
+  assert.equal(laBienTheTen('Bristar', 'Bristar Group'), true);
+  assert.equal(laBienTheTen('The a2 Milk Company', 'The a2 Milk Company Limited'), true);
+  assert.equal(laBienTheTen('Aqua Vietnam', 'aqua  vietnam'), true);
+});
+
+test('laBienTheTen: hai cong ty khac nhau KHONG bi gop', () => {
+  assert.equal(laBienTheTen('Abbott', 'Hoa Linh Pharma'), false);
+  assert.equal(laBienTheTen('Kendal Nutricare', 'TRUONG VINH KY HIGH SCHOOL'), false);
+});
+
+test('laBienTheTen: so theo TU, khong phai chuoi con', () => {
+  // nameKey("Ensure") nam gon trong nameKey("Ensured Safety") neu so chuoi con
+  // tran. Hai cong ty do khong lien quan gi nhau.
+  assert.equal(laBienTheTen('Ensure', 'Ensured Safety Ltd'), false);
+  assert.equal(laBienTheTen('Anker', 'Ankerite Mining'), false);
+  // Nhung them han mot tu thi van la bien the.
+  assert.equal(laBienTheTen('Ensure', 'Ensure Vietnam'), true);
+});
+
+test('laBienTheTen: chuoi rong khong khop voi bat ky cai gi', () => {
+  assert.equal(laBienTheTen('', 'Abbott'), false);
+  assert.equal(laBienTheTen('Abbott', ''), false);
+  assert.equal(laBienTheTen('   ', '  '), false);
 });
