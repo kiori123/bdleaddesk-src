@@ -83,38 +83,89 @@
 -- phep so sanh voi NULL deu khong thoa - tuc dong do KHONG bi xoa. Huong an
 -- toan: bo sot mot dong rac con hon xoa nham mot alias dung.
 
-create or replace view alias_hoc_yeu as
+-- KHONG tao view, KHONG ghi gi ca. Ban truoc dung `create or replace view`,
+-- tuc DDL - van la mot lan ghi vao DB that, trong khi phan nay dang tu goi la
+-- "chi doc". Dung CTE thi moi cau duoi day la mot cau SELECT thuan, chay bao
+-- nhieu lan cung khong doi mot byte nao.
+--
+-- Hai bieu thuc doc `n` va `tong` ra tu chinh cau ghi chu ma ghiAliasHocDuoc()
+-- da viet ("... 25/31 ket qua khai ten nay." hoac "... ten nay ra 4/7 nguoi.").
+-- Dong nao khong doc duoc se ra NULL, va moi phep so sanh voi NULL deu khong
+-- thoa - tuc dong do KHONG bi xoa. Huong an toan: bo sot mot dong rac con hon
+-- xoa nham mot alias dung.
+
+-- 1a. Dem nhanh. Nen ra 85 va 65.
+with yeu as (
+  select
+    alias,
+    employer,
+    priority,
+    substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int as nguoi_dong_y,
+    substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int as tong_nguoi
+  from brand_alias
+  where note like 'Tu hoc%'
+    and substring(note from '(\d+)/\d+ (?:ket qua|nguoi)') is not null
+    and (
+      substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int < 3
+      or 1.0 * substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int
+             / nullif(substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int, 0) < 0.5
+    )
+)
 select
-  alias,
-  employer,
-  priority,
-  note,
-  substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int as nguoi_dong_y,
-  substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int as tong_nguoi,
-  round(
-    100.0 * substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int
-          / nullif(substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int, 0)
-  ) as phan_tram
-from brand_alias
-where note like 'Tu hoc%'
-  and substring(note from '(\d+)/\d+ (?:ket qua|nguoi)') is not null
-  and (
-    substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int < 3
-    or 1.0 * substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int
-           / nullif(substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int, 0) < 0.5
-  );
+  (select count(*) from yeu) as se_xoa,
+  (select count(*) from (
+     select a.alias from brand_alias a
+     group by a.alias
+     having count(*) = count(*) filter (
+       where (a.alias, a.employer) in (select alias, employer from yeu))
+   ) t) as brand_mat_het_alias;
 
--- 1a. Danh sach se bi xoa, te nhat len dau. Nen ra 83 dong.
-select * from alias_hoc_yeu order by phan_tram, tong_nguoi desc;
+-- 1b. Danh sach se bi xoa, te nhat len dau.
+with yeu as (
+  select
+    alias,
+    employer,
+    priority,
+    substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int as nguoi_dong_y,
+    substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int as tong_nguoi
+  from brand_alias
+  where note like 'Tu hoc%'
+    and substring(note from '(\d+)/\d+ (?:ket qua|nguoi)') is not null
+    and (
+      substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int < 3
+      or 1.0 * substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int
+             / nullif(substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int, 0) < 0.5
+    )
+)
+select
+  round(100.0 * nguoi_dong_y / nullif(tong_nguoi, 0)) as phan_tram,
+  nguoi_dong_y, tong_nguoi, priority, alias, employer
+from yeu
+order by phan_tram, tong_nguoi desc;
 
--- 1b. Brand nao se KHONG CON alias nao. Nen ra 63 dong.
---     Nhin qua mot luot: co cai ten nao ma mat alias la dau that su khong.
-select a.alias
+-- 1c. Brand nao se KHONG CON alias nao. Nhin qua mot luot: co ten nao ma mat
+--     alias la dau that su khong.
+with yeu as (
+  select
+    alias,
+    employer,
+    priority,
+    substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int as nguoi_dong_y,
+    substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int as tong_nguoi
+  from brand_alias
+  where note like 'Tu hoc%'
+    and substring(note from '(\d+)/\d+ (?:ket qua|nguoi)') is not null
+    and (
+      substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int < 3
+      or 1.0 * substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int
+             / nullif(substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int, 0) < 0.5
+    )
+)
+select a.alias, count(*) as so_dong_hien_co
 from brand_alias a
 group by a.alias
 having count(*) = count(*) filter (
-  where (a.alias, a.employer) in (select alias, employer from alias_hoc_yeu)
-)
+  where (a.alias, a.employer) in (select alias, employer from yeu))
 order by a.alias;
 
 -- ---------------------------------------------------------------------------
@@ -122,16 +173,48 @@ order by a.alias;
 -- ---------------------------------------------------------------------------
 
 -- begin;
---   -- Giu lai mot ban sao de doi chieu/hoan tac trong vai ngay toi.
+--   -- Giu mot ban sao de doi chieu/hoan tac trong vai ngay toi.
 --   create table if not exists brand_alias_da_xoa_20261009 as
+--   with yeu as (
+--     select
+--       alias,
+--       employer,
+--       priority,
+--       substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int as nguoi_dong_y,
+--       substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int as tong_nguoi
+--     from brand_alias
+--     where note like 'Tu hoc%'
+--       and substring(note from '(\d+)/\d+ (?:ket qua|nguoi)') is not null
+--       and (
+--         substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int < 3
+--         or 1.0 * substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int
+--                / nullif(substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int, 0) < 0.5
+--       )
+--   )
 --   select b.*, now() as xoa_luc
 --   from brand_alias b
---   where (b.alias, b.employer) in (select alias, employer from alias_hoc_yeu);
+--   where (b.alias, b.employer) in (select alias, employer from yeu);
 --
+--   with yeu as (
+--     select
+--       alias,
+--       employer,
+--       priority,
+--       substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int as nguoi_dong_y,
+--       substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int as tong_nguoi
+--     from brand_alias
+--     where note like 'Tu hoc%'
+--       and substring(note from '(\d+)/\d+ (?:ket qua|nguoi)') is not null
+--       and (
+--         substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int < 3
+--         or 1.0 * substring(note from '(\d+)/\d+ (?:ket qua|nguoi)')::int
+--                / nullif(substring(note from '\d+/(\d+) (?:ket qua|nguoi)')::int, 0) < 0.5
+--       )
+--   )
 --   delete from brand_alias b
---   where (b.alias, b.employer) in (select alias, employer from alias_hoc_yeu);
+--   where (b.alias, b.employer) in (select alias, employer from yeu);
 --
---   -- Phai ra 83. Khac nhieu thi dung commit, roll back va xem lai Phan 1.
+--   -- Phai ra 85. Khac nhieu thi dung commit, roll back va xem lai Phan 1.
 --   select count(*) as da_xoa from brand_alias_da_xoa_20261009;
 -- commit;
 
