@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { strengthOf } from '@/lib/rank';
 import { MAX_BRAND_MOI_LAN } from '@/lib/scanLimits';
-import { pollJob, type Cand, type JobView, type BrandStat } from './actions';
+import { pollJob, thuTenPhapNhan, type Cand, type JobView, type BrandStat } from './actions';
 
 /**
  * Hai viec, khong hon:
@@ -68,6 +68,78 @@ function ThongKe({ s }: { s: BrandStat | undefined }) {
     <span className="text-[11.5px] text-ink-faint">
       {s.found} found, everyone in SignalHire&rsquo;s index for this company.
     </span>
+  );
+}
+
+/**
+ * Thu mot ten phap nhan khac cho mot brand khong tim thay ai.
+ *
+ * Dat NGAY DUOI cau "khong co trong SignalHire", vi do la dung luc PIC biet
+ * minh can mot ten khac. Truoc day cau do la ngo cut: sua alias la quyen
+ * admin, ma doi hinh co 8 PIC tren 2 admin, nen PIC con lai phai doan mot ten
+ * roi go lai ca lan quet - va doan dung cung khong duoc he thong nho.
+ *
+ * Khong luu mu: server xac minh bang mot lan goi SignalHire that, chi luu khi
+ * co nguoi that o ten do, va bao lai ngay tai cho (xem thuTenPhapNhan).
+ */
+function ThuTen({ brand }: { brand: string }) {
+  const [ten, setTen] = useState('');
+  const [dangChay, setDangChay] = useState(false);
+  const [ketQua, setKetQua] = useState<{ ok: boolean; chu: string } | null>(null);
+
+  async function gui() {
+    if (!ten.trim() || dangChay) return;
+    setDangChay(true); setKetQua(null);
+    try {
+      const r = await thuTenPhapNhan(brand, ten);
+      if (!r.ok) setKetQua({ ok: false, chu: r.error });
+      else if (r.daLuu) {
+        setKetQua({
+          ok: true,
+          chu: `Found ${r.soNguoi} ${r.soNguoi === 1 ? 'person' : 'people'} under that name, and saved it `
+            + `for ${brand}. Scan ${brand} again to pull them in - and from now on it goes straight there.`,
+        });
+      } else {
+        setKetQua({ ok: false, chu: `SignalHire has nobody under that name either. Nothing was saved. Try another spelling, or the parent company.` });
+      }
+    } catch (e: any) {
+      setKetQua({ ok: false, chu: e?.message ?? 'Something went wrong.' });
+    } finally {
+      setDangChay(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 max-w-[62ch] rounded-lg border border-line bg-surface-sunk px-3.5 py-3">
+      <label className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+        Who owns {brand}?
+      </label>
+      <div className="mt-1.5 flex flex-wrap gap-2">
+        <input
+          value={ten}
+          onChange={(e) => setTen(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') gui(); }}
+          placeholder="Legal entity or parent company"
+          className="min-w-[16rem] flex-1 rounded-lg border border-line bg-white px-3 py-1.5 text-sm"
+        />
+        <button
+          type="button"
+          onClick={gui}
+          disabled={dangChay || ten.trim().length < 2}
+          className="rounded-lg bg-grad-teal px-3.5 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {dangChay ? 'Checking' : 'Check this name'}
+        </button>
+      </div>
+      <p className="mt-1.5 text-[11.5px] leading-snug text-ink-dim">
+        Nothing is saved unless SignalHire actually has people there. Costs one search, no credits.
+      </p>
+      {ketQua && (
+        <p className={`mt-2 text-[12.5px] leading-relaxed ${ketQua.ok ? 'text-teal-deep' : 'text-red-deep'}`}>
+          {ketQua.chu}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -373,10 +445,11 @@ export default function Results({
               {khongThay.map((s) => s.brand).join(', ')}
             </b>{' '}
             {khongThay.length === 1 ? 'is' : 'are'} not in SignalHire&rsquo;s index at all, under
-            the mapped company or the brand name itself. Check whether it trades under a
-            different legal entity and search that name.
+            the mapped company or the brand name itself. People usually put the company that owns
+            the brand, not the brand, so the owner&rsquo;s name is what to try.
           </p>
         )}
+        {khongThay.map((s) => <ThuTen key={s.brand} brand={s.brand} />)}
         {locHet.length > 0 && (
           <p className="mt-2 max-w-[62ch] text-[13px] leading-relaxed text-ink-dim">
             <b className="text-ink">
