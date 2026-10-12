@@ -624,7 +624,7 @@ test('sheet NOI RO la co phan tach rieng va vi sao', () => {
   const chu = chuTrongSheet(veTach());
   assert.ok(/reported separately/i.test(chu), 'phai co tieu de noi ro day la phan tach rieng');
   assert.ok(/not in the totals/i.test(chu), 'phai noi ro no khong nam trong tong');
-  assert.ok(/channel, not a product category/i.test(chu),
+  assert.ok(/channel pays for reveals but owns no brands/i.test(chu),
     'phai giai thich vi sao tach - khong phai tach suong');
 });
 
@@ -644,6 +644,29 @@ test('dong Total KHONG cong so cua category tach rieng', () => {
 test('khong truyen tachRieng thi sheet giu nguyen nhu cu', () => {
   const chu = chuTrongSheet(ve().ws);
   assert.ok(!/reported separately/i.test(chu));
+});
+
+test('chi tieu cua KENH VAN nam trong dong Total', () => {
+  // Day la cho de sai nhat cua ca tinh nang, va no da sai that mot lan.
+  //
+  // Khi Livestream con brand rieng, tru no ra khoi tong la hop ly. Nhung sau
+  // khi 93 brand duoc xep ve dung nganh, kenh con 0 brand va 0 contact ma van
+  // tra 101 credit - 17% tong chi. Tru phan do ra khoi tong TRONG KHI van dem
+  // contact ma no mua ve la lam chi phi moi contact dep hon thuc te 17%.
+  //
+  // Kenh van khong co DONG rieng trong bang (moi ti le deu chia cho so
+  // contact, ma kenh khong co contact nao) - nhung chi tieu thi phai vao tong.
+  const ws = veTach();
+  const tongChinh = CATS.reduce((s, c) => s + c.spend, 0);
+  let thay = false;
+  ws.eachRow((row) => {
+    if (String(row.getCell(1).value) !== 'Total') return;
+    thay = true;
+    assert.equal(row.getCell(2).value, tongChinh + LIVESTREAM.spend,
+      'Total phai gom ca chi tieu cua kenh');
+    assert.notEqual(row.getCell(2).value, tongChinh);
+  });
+  assert.ok(thay, 'khong tim thay dong Total');
 });
 
 test('dong tach rieng nam DUOI dong Total, khong xen vao giua bang', () => {

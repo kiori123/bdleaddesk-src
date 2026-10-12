@@ -251,7 +251,19 @@ export function veSheetCreditContacts(
   const colorOf = new Map<string, string>();
   alphaCats.forEach((c, i) => colorOf.set(c.id, colorForIndex(i)));
 
-  const totalSpend = list.reduce((s, c) => s + c.spend, 0);
+  /**
+   * Tong chi GOM CA phan kenh da tra, du kenh khong co dong rieng trong bang.
+   *
+   * Phai gom, vi contact ma so credit do mua ve DANG duoc dem trong bang
+   * chinh. Sau khi brand duoc xep ve dung nganh, Livestream con 0 brand va 0
+   * contact nhung van tra 101 credit - 17% tong chi. Tru phan do ra khoi tong
+   * ma van giu contact lai la lam chi phi moi contact dep hon thuc te 17%.
+   *
+   * Kenh van KHONG co dong rieng trong bang va khong duoc xep hang: moi ti le
+   * o day deu chia cho so contact, ma kenh thi khong co contact nao de chia.
+   */
+  const totalSpend = list.reduce((s, c) => s + c.spend, 0)
+    + dsTachRieng.reduce((s, c) => s + c.spend, 0);
   const totalBrands = list.reduce((s, c) => s + c.brands, 0);
   const totalPaid = list.reduce((s, c) => s + c.paid, 0);
   const totalPaidFull = list.reduce((s, c) => s + c.paidFull, 0);
@@ -511,11 +523,10 @@ export function veSheetCreditContacts(
     rIdx += 1;
     ws.mergeCells(`A${rIdx}:K${rIdx}`);
     ws.getRow(rIdx).getCell(1).value =
-      'Livestream is a channel, not a product category. The same brand lands here or in its own'
-      + ' category depending on who filed it - a live push for Huggies is still Mom & Baby - so these'
-      + ' rows cut across the categories above rather than sitting beside them, and averaging the two'
-      + ' together describes the same work twice. Email coverage here is 28% against 50-61% elsewhere;'
-      + ' why is not yet established.';
+      'A channel pays for reveals but owns no brands - a live push for Huggies is still Mom & Baby.'
+      + ' Its spend IS counted in the Total above, because the contacts it bought are counted there'
+      + ' too, under whichever category the brand belongs to. What it has no row for is the ratios:'
+      + ' every rate in the table divides by a contact count, and a channel has none of its own.';
     ws.getRow(rIdx).getCell(1).font = { italic: true, size: 10, color: { argb: 'FF6F878B' } };
     ws.getRow(rIdx).alignment = { wrapText: true, vertical: 'top' };
     ws.getRow(rIdx).height = 28;

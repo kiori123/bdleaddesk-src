@@ -322,7 +322,8 @@ export async function dungWorkbookXuat(
 
   const [{ data: categories, error: ecat }, { data: allBrands, error: ebr }, { data: ledger, error: eled }] =
     await Promise.all([
-      db.from('category').select('id, name').eq('active', true).order('name'),
+      // `kind` de biet dong nao la kenh - xem laTachRieng ben duoi.
+      db.from('category').select('id, name, kind').eq('active', true).order('name'),
       db.from('brand').select('id, name, category_id'),
       (() => {
         let q = db.from('credit_ledger').select('category_id, amount').eq('status', 'committed');
@@ -501,15 +502,17 @@ export async function dungWorkbookXuat(
    * Day la cach chua TAM. Cach chua that la xep lai cac brand nay ve dung
    * nganh cua chung; viec do can mat nguoi doc tung ten, khong tu dong duoc.
    *
-   * So khop theo TEN da chuan hoa chu khong theo id: id khac nhau giua cac moi
-   * truong, con ten thi admin doc duoc va sua duoc ngay tai day.
+   * Doc tu `category.kind` chu KHONG con do ten: tu khi socom_kenh_rieng.sql
+   * chay, DB da biet dong nao la kenh. Do ten thi phai sua file nay moi lan
+   * mo them mot kenh, va se quen.
    */
-  const CATEGORY_TACH_RIENG = ['livestream'];
-  const laTachRieng = (ten: string) =>
-    CATEGORY_TACH_RIENG.includes(String(ten ?? '').trim().toLowerCase());
+  const kenhIds = new Set(
+    ((categories ?? []) as any[]).filter((c) => c.kind === 'channel').map((c) => c.id),
+  );
+  const laTachRieng = (id: string) => kenhIds.has(id);
 
-  const dsCatChinh = dsCat.filter((c) => !laTachRieng(c.name));
-  const dsCatTachRieng = dsCat.filter((c) => laTachRieng(c.name));
+  const dsCatChinh = dsCat.filter((c) => !laTachRieng(c.id));
+  const dsCatTachRieng = dsCat.filter((c) => laTachRieng(c.id));
 
   /**
    * Nuoc troi nhat trong nhom rong, de cau ket luan noi duoc dich danh
