@@ -484,6 +484,31 @@ export async function dungWorkbookXuat(
   const dsCat = [...catAgg.values()];
 
   /**
+   * Category bao cao TACH RIENG tren sheet Credit & Contacts.
+   *
+   * Livestream la KOL/streamer chu khong phai phap nhan doanh nghiep, nen
+   * SignalHire gan nhu khong giu email cong ty cua ho: do tren du lieu that
+   * la 28% co email, so voi 50-61% cua cac nganh doanh nghiep. Gop chung vao
+   * mot trung binh thi ca hai con so deu sai - va da sai that: mot tuan co
+   * 96% khoi luong la Livestream keo trung binh email ca ky tu 67% xuong 28%,
+   * doc nhu toan bo cong cu xuong cap trong khi nganh doanh nghiep khong he
+   * doi.
+   *
+   * TACH chu KHONG BO. veSheetCreditContacts() in chung day du ngay duoi dong
+   * Total, kem mot cau noi ro vi sao. Bo han di thi nguoi doc khong co cach
+   * nao biet la thieu.
+   *
+   * So khop theo TEN da chuan hoa chu khong theo id: id khac nhau giua cac moi
+   * truong, con ten thi admin doc duoc va sua duoc ngay tai day.
+   */
+  const CATEGORY_TACH_RIENG = ['livestream'];
+  const laTachRieng = (ten: string) =>
+    CATEGORY_TACH_RIENG.includes(String(ten ?? '').trim().toLowerCase());
+
+  const dsCatChinh = dsCat.filter((c) => !laTachRieng(c.name));
+  const dsCatTachRieng = dsCat.filter((c) => laTachRieng(c.name));
+
+  /**
    * Nuoc troi nhat trong nhom rong, de cau ket luan noi duoc dich danh
    * ("33 of those are in Republic of Korea") thay vi mot cau chung chung.
    */
@@ -528,7 +553,10 @@ export async function dungWorkbookXuat(
     .sort((a, b) => b.empty - a.empty || b.empty / b.paid - a.empty / a.paid)
     .slice(0, 10);
 
-  veSheetCreditContacts(s5, { rows: dsCat, viTri, brands: brandRong, from: fFrom, to: fTo });
+  veSheetCreditContacts(s5, {
+    rows: dsCatChinh, tachRieng: dsCatTachRieng,
+    viTri, brands: brandRong, from: fFrom, to: fTo,
+  });
 
   // ke soc nhe cho de doc
   for (const ws of [s1, s2, s3]) {

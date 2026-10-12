@@ -187,6 +187,22 @@ export function veSheetCreditContacts(
   ws: ExcelJS.Worksheet,
   opts: {
     rows: CatRow[];
+    /**
+     * Category bao cao TACH RIENG, khong gop vao tong va khong xep hang cung
+     * nhom con lai.
+     *
+     * Ly do ton tai: Livestream la KOL/streamer, khong phai phap nhan doanh
+     * nghiep, nen SignalHire gan nhu khong co email cong ty cua ho - do tren
+     * du lieu that la 28% so voi 50-61% cua cac nganh doanh nghiep. Tron vao
+     * mot trung binh chung thi ca hai so deu sai: nganh doanh nghiep bi keo
+     * xuong, con Livestream thi bi cham diem bang mot thuoc do khong danh cho
+     * no.
+     *
+     * TACH chu KHONG BO. Chung van duoc in day du o ngay duoi bang, co tieu de
+     * rieng va mot cau noi ro vi sao. Bo han di thi nguoi doc khong co cach
+     * nao biet la thieu, va do la kieu bao cao hong nhat.
+     */
+    tachRieng?: CatRow[];
     /** Phan tich nguyen nhan theo noi nguoi do ngoi - xem ViTriRow. */
     viTri: ViTriRow[];
     /** Brand dang ganh so reveal rong, da sap giam dan - xem BrandRong. */
@@ -196,6 +212,7 @@ export function veSheetCreditContacts(
   },
 ): void {
   const list = opts.rows;
+  const dsTachRieng = opts.tachRieng ?? [];
   const viTri = opts.viTri;
   const brands = opts.brands;
   const fFrom = opts.from;
@@ -206,9 +223,12 @@ export function veSheetCreditContacts(
   ws.getCell('A1').font = { bold: true, size: 16, color: { argb: TEAL } };
 
   ws.mergeCells('A2:K2');
-  ws.getCell('A2').value = fFrom || fTo
-    ? `All categories, all brands (ignores the Category/Owner/Status filters above). Credit spend counted from ${fFrom || 'the start'} to ${fTo || 'now'}. Contacts reflect the current state.`
-    : 'All categories, all brands, all time (ignores the Category/Owner/Status filters above).';
+  const ghiChuTach = dsTachRieng.length
+    ? ` ${dsTachRieng.map((c) => c.name).join(', ')} ${dsTachRieng.length === 1 ? 'is' : 'are'} reported separately below the table and left out of the totals - see the note there.`
+    : '';
+  ws.getCell('A2').value = (fFrom || fTo
+    ? `All brands (ignores the Category/Owner/Status filters above). Credit spend counted from ${fFrom || 'the start'} to ${fTo || 'now'}. Contacts reflect the current state.`
+    : 'All brands, all time (ignores the Category/Owner/Status filters above).') + ghiChuTach;
   ws.getCell('A2').font = { italic: true, size: 10, color: { argb: 'FF6F878B' } };
 
   /**
@@ -460,6 +480,50 @@ export function veSheetCreditContacts(
   totalRow.font = { bold: true };
   totalRow.getCell(10).numFmt = '0%';
   totalRow.eachCell((c) => { c.border = { top: { style: 'thin', color: { argb: 'FFC3C2B7' } } }; });
+
+  /**
+   * Nhom tach rieng, in NGAY DUOI dong Total va khong cong vao no.
+   *
+   * Dat sau Total chu khong xen vao giua bang: nguoi doc quet mat tu tren
+   * xuong, gap Total la biet phan so sanh duoc da het, phan duoi la mot loai
+   * khac. Van du cot, van dung dinh dang - khong thu gi bi giau, chi la khong
+   * bi tron.
+   */
+  if (dsTachRieng.length) {
+    rIdx += 2;
+    const tieuDe = ws.getRow(rIdx);
+    ws.mergeCells(`A${rIdx}:K${rIdx}`);
+    tieuDe.getCell(1).value = 'Reported separately - not in the totals above';
+    tieuDe.getCell(1).font = { bold: true, color: { argb: TEAL } };
+
+    rIdx += 1;
+    ws.mergeCells(`A${rIdx}:K${rIdx}`);
+    ws.getRow(rIdx).getCell(1).value =
+      'These are creators and streamers, not companies, so SignalHire rarely holds a work email for them'
+      + ' - 28% against 50-61% for the corporate categories. Blending them into one average misreports both:'
+      + ' it drags the corporate figure down and judges this one by a yardstick built for a different business.';
+    ws.getRow(rIdx).getCell(1).font = { italic: true, size: 10, color: { argb: 'FF6F878B' } };
+    ws.getRow(rIdx).alignment = { wrapText: true, vertical: 'top' };
+    ws.getRow(rIdx).height = 28;
+
+    for (const c of [...dsTachRieng].sort((a, b) => b.spend - a.spend)) {
+      rIdx += 1;
+      const coverage = c.brands > 0 ? c.withContact / c.brands : null;
+      const fullRate = c.paid > 0 ? c.paidFull / c.paid : null;
+      const row = ws.getRow(rIdx);
+      row.values = [
+        c.name, c.spend, '', c.brands, c.withContact,
+        c.noContact, coverage != null ? coverage : '', c.paid, c.paidFull,
+        fullRate != null ? fullRate : '', c.free,
+      ];
+      row.getCell(1).font = { bold: true };
+      row.getCell(7).numFmt = '0%';
+      row.getCell(10).numFmt = '0%';
+      if (c.paid > 0 && c.paid < MIN_CONTACT_XEP_HANG) {
+        row.getCell(10).font = { italic: true, color: { argb: 'FF9AA8AB' } };
+      }
+    }
+  }
 
   /**
    * Data bar NGAY TRONG cot dem - day la thu thay cho bieu do anh da bi bo

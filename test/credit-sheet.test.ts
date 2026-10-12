@@ -579,3 +579,79 @@ test('nhom khong co location duoc noi ro la bi loai khoi so sanh', () => {
     `phai noi ro bi loai: "${thay}" - 22 dong nay la du lieu di tru tu n8n, `
     + 'khong phai reveal cua app, va chung 0% rong nen de vao so sanh se lam lech');
 });
+
+// --- Category bao cao tach rieng ------------------------------------------
+//
+// Livestream la KOL/streamer chu khong phai phap nhan doanh nghiep, nen
+// SignalHire gan nhu khong giu email cong ty cua ho. Tron vao trung binh
+// chung thi ca hai so deu sai - da sai that: mot tuan 96% khoi luong la
+// Livestream keo trung binh email tu 67% xuong 28%.
+//
+// Nhung TACH khong duoc thanh BO. Bo han thi nguoi doc khong co cach nao biet
+// la thieu, va do la kieu bao cao hong nhat - nguy hiem hon ca mot con so xau.
+
+const LIVESTREAM: CatRow = {
+  id: 'c9', name: 'Livestream', brands: 9, withContact: 9, noContact: 0, spend: 60,
+  paid: 196, paidFull: 20, paidMailOnly: 35, paidPhoneOnly: 10, paidNeither: 131,
+  paidNeitherWithLinkedin: 126, free: 0, paidVn: 190, paidVnEmpty: 128, paidNgoai: 6, paidNgoaiEmpty: 3,
+};
+
+function veTach() {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Credit & Contacts');
+  veSheetCreditContacts(ws, {
+    rows: CATS, tachRieng: [LIVESTREAM], viTri: VI_TRI, brands: BRANDS, from: null, to: null,
+  });
+  return ws;
+}
+
+/** Doc het o cua sheet thanh mot chuoi, de do chu xuat hien o dau cung thay. */
+function chuTrongSheet(ws: ExcelJS.Worksheet): string {
+  const ra: string[] = [];
+  ws.eachRow((row) => row.eachCell((c) => { if (c.value != null) ra.push(String(c.value)); }));
+  return ra.join(' | ');
+}
+
+test('category tach rieng VAN duoc in ra, khong bi bo', () => {
+  // Day la bat bien quan trong nhat cua ca tinh nang: giau di mot category
+  // khoi bao cao ma khong noi gi la mot kieu noi doi bang cach im lang.
+  assert.ok(chuTrongSheet(veTach()).includes('Livestream'));
+});
+
+test('sheet NOI RO la co phan tach rieng va vi sao', () => {
+  const chu = chuTrongSheet(veTach());
+  assert.ok(/reported separately/i.test(chu), 'phai co tieu de noi ro day la phan tach rieng');
+  assert.ok(/not in the totals/i.test(chu), 'phai noi ro no khong nam trong tong');
+  assert.ok(/work email/i.test(chu), 'phai giai thich vi sao tach - khong phai tach suong');
+});
+
+test('dong Total KHONG cong so cua category tach rieng', () => {
+  const ws = veTach();
+  const tongPaid = CATS.reduce((s, c) => s + c.paid, 0);
+  let thay = false;
+  ws.eachRow((row) => {
+    if (String(row.getCell(1).value) !== 'Total') return;
+    thay = true;
+    assert.equal(row.getCell(8).value, tongPaid, 'Total phai la tong cua rieng nhom chinh');
+    assert.notEqual(row.getCell(8).value, tongPaid + LIVESTREAM.paid);
+  });
+  assert.ok(thay, 'khong tim thay dong Total');
+});
+
+test('khong truyen tachRieng thi sheet giu nguyen nhu cu', () => {
+  const chu = chuTrongSheet(ve().ws);
+  assert.ok(!/reported separately/i.test(chu));
+});
+
+test('dong tach rieng nam DUOI dong Total, khong xen vao giua bang', () => {
+  // Nguoi doc quet tu tren xuong: gap Total la biet phan so sanh duoc da het.
+  const ws = veTach();
+  let dongTotal = -1, dongLivestream = -1;
+  ws.eachRow((row, i) => {
+    const v = String(row.getCell(1).value ?? '');
+    if (v === 'Total') dongTotal = i;
+    if (v === 'Livestream') dongLivestream = i;
+  });
+  assert.ok(dongTotal > 0 && dongLivestream > 0);
+  assert.ok(dongLivestream > dongTotal, 'Livestream phai nam duoi dong Total');
+});
