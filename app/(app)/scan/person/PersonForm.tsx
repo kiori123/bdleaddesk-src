@@ -14,7 +14,7 @@ import { useRouter } from 'next/navigation';
  * nham link. Nen mac dinh la duong ten + cong ty: sai thi khong mat gi.
  */
 
-type Cat = { id: string; name: string };
+type Cat = { id: string; name: string; kind?: string | null };
 
 export default function PersonForm({ categories }: { categories: Cat[] }) {
   const router = useRouter();
@@ -24,6 +24,17 @@ export default function PersonForm({ categories }: { categories: Cat[] }) {
   const [done, setDone] = useState('');
 
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? '');
+
+  /*
+    Chon mot KENH (SOCOM) thi phai noi them brand thuoc nganh nao - y het
+    SearchForm. Thieu cho nay thi /api/reveal khong nhan duoc productCategoryId,
+    `damBaoBrand()` lui ve `categoryId`, va brand lai ket duoi chinh cai kenh
+    do. Da xay ra that: 11 brand tao trong ngay 12/10/2026 (Snickers, Anker,
+    Sokfarm, Ecovas...) deu roi vao Livestream vi man nay khong hoi.
+  */
+  const laKenh = categories.find((c) => c.id === categoryId)?.kind === 'channel';
+  const dsNganh = categories.filter((c) => c.kind !== 'channel');
+  const [nganhBrandId, setNganhBrandId] = useState('');
   const [company, setCompany] = useState('');
   const [person, setPerson] = useState('');
   const [link, setLink] = useState('');
@@ -42,6 +53,11 @@ export default function PersonForm({ categories }: { categories: Cat[] }) {
     setErr(''); setDone('');
     if (!company.trim()) { setErr('Type the company or brand they work at.'); return; }
     if (!categoryId) { setErr('Pick the category this belongs to.'); return; }
+    if (laKenh && !nganhBrandId) {
+      setErr('Pick which category these brands belong to. The channel pays, but the brand has to '
+        + 'be filed under a real category.');
+      return;
+    }
 
     start(async () => {
       const res = await fetch('/api/scan', {
@@ -49,6 +65,7 @@ export default function PersonForm({ categories }: { categories: Cat[] }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           categoryId,
+          productCategoryId: laKenh ? nganhBrandId : null,
           brands: [{ name: company.trim(), tier: 1 }],
           location: 'Vietnam and Southeast Asia',
           role: 'Decision makers, all functions',
@@ -74,6 +91,11 @@ export default function PersonForm({ categories }: { categories: Cat[] }) {
     // ty nam san trong ket qua reveal, bat go lai la bat lam ho may mot viec no
     // tu lam duoc. Go vao thi van dung, va de len cai may doan ra.
     if (!categoryId) { setErr('Pick the category this belongs to.'); return; }
+    if (laKenh && !nganhBrandId) {
+      setErr('Pick which category these brands belong to. The channel pays, but the brand has to '
+        + 'be filed under a real category.');
+      return;
+    }
 
     start(async () => {
       const res = await fetch('/api/reveal', {
@@ -81,6 +103,7 @@ export default function PersonForm({ categories }: { categories: Cat[] }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           categoryId,
+          productCategoryId: laKenh ? nganhBrandId : null,
           brandId: null,
           brandName: company.trim() || null,
           uids: [url],
@@ -137,11 +160,33 @@ export default function PersonForm({ categories }: { categories: Cat[] }) {
           )}
         </div>
         <div>
-          <label className={label} htmlFor="cat">Category</label>
+          <label className={label} htmlFor="cat">{laKenh ? 'Budget' : 'Category'}</label>
           <select id="cat" className={input} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}{c.kind === 'channel' ? ' (channel)' : ''}
+              </option>
+            ))}
           </select>
         </div>
+
+        {laKenh && (
+          <div>
+            <label className={label} htmlFor="nganh">These brands belong to</label>
+            <select
+              id="nganh" className={input} value={nganhBrandId}
+              onChange={(e) => setNganhBrandId(e.target.value)}
+            >
+              <option value="">Pick a category</option>
+              {dsNganh.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <p className="mt-1 text-[11.5px] leading-snug text-ink-dim">
+              {categories.find((c) => c.id === categoryId)?.name} pays for it. The brand and its
+              contacts are filed here so the category owner sees them too, and you keep seeing them
+              because {categories.find((c) => c.id === categoryId)?.name} worked the brand.
+            </p>
+          </div>
+        )}
       </div>
 
       {tab === 'name' ? (

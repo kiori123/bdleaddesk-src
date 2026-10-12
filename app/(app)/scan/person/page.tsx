@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export default async function PersonPage() {
   const db = await supabaseServer();
   const { data: cats } = await db
-    .from('category').select('id, name').eq('active', true).order('name');
+    .from('category').select('id, name, kind').eq('active', true).order('name');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100dvh - 108px)' }}>
