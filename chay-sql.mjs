@@ -34,11 +34,39 @@ if (!tenFile) {
   exit(1);
 }
 
-const pat = (env.SUPABASE_PAT ?? '').trim();
+/**
+ * Doc mot bien tu .env.local.
+ *
+ * Co mat vi dan token vao prompt cua terminal hay khong an - Ctrl+V bi nuot
+ * trong nhieu terminal, va Read-Host thi khong echo nen khong biet da dan
+ * duoc chua. Dan vao file bang editor thi luon duoc.
+ *
+ * .env.local da nam trong .gitignore (`.env*`) va da la cho giu bi mat cua du
+ * an, nen khong mo them duong ro ri nao.
+ */
+function docEnvLocal(ten) {
+  try {
+    for (const dong of readFileSync('.env.local', 'utf8').split(/\r?\n/)) {
+      if (!dong.startsWith(`${ten}=`)) continue;
+      return dong.slice(ten.length + 1).trim().replace(/^["']|["']$/g, '');
+    }
+  } catch { /* khong co file thi thoi */ }
+  return '';
+}
+
+// Bien moi truong thang duoc uu tien: no de doi hon khi can chay mot lan voi
+// token khac.
+const pat = (env.SUPABASE_PAT ?? '').trim() || docEnvLocal('SUPABASE_PAT');
 if (!pat) {
-  console.error('Chua co SUPABASE_PAT.');
-  console.error('  1. Vao https://supabase.com/dashboard/account/tokens, tao mot token.');
-  console.error('  2. PowerShell:  $env:SUPABASE_PAT = "sbp_..."');
+  console.error('Chua co SUPABASE_PAT. Chon mot trong hai cach:');
+  console.error('');
+  console.error('  A. Mo .env.local bang editor, them mot dong:');
+  console.error('       SUPABASE_PAT=sbp_...');
+  console.error('     (.env.local da duoc gitignore, khong len repo)');
+  console.error('');
+  console.error('  B. PowerShell:  $env:SUPABASE_PAT = "sbp_..."');
+  console.error('');
+  console.error('  Token lay o https://supabase.com/dashboard/account/tokens');
   exit(1);
 }
 
