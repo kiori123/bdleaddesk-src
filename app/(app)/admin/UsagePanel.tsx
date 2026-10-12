@@ -10,8 +10,9 @@
 //                     du nua.
 //   - Theo nganh    : By credit va Free cong lai bang tong; Bulk la cot chong
 //                     lan, chi de biet bao nhieu dong vao theo me import
-//   - Ve rong       : contact ton credit ma khong co email lan phone. SignalHire
-//                     khong tinh tien nhung nen tang, nen van phai hien ra
+//   - Lien he duoc  : contact ton credit con it nhat mot duong lien he -
+//                     email, phone HOAC LinkedIn. Day la con so tra loi "tien
+//                     co mua duoc gi khong", khong phai Full rate (paid)
 //
 // Moi thu tinh tu quota_config.measure_since tro di. Truoc moc do la giai doan
 // chay khoa free lan du lieu import tay, tron so, do vao khong co nghia.
@@ -81,7 +82,7 @@ export default async function UsagePanel() {
   const { data: cfg } = await db.from('quota_config').select('measure_since').maybeSingle();
 
   // Moc bat dau do. Truoc moc nay la giai doan chay key free va co ca du lieu
-  // import tay, tron so, nen khong tinh vao Spent / Gained / Came back empty.
+  // import tay, tron so, nen khong tinh vao Spent / Gained.
   const measureSince = (cfg as any)?.measure_since ? new Date((cfg as any).measure_since) : null;
   const mocISO = measureSince ? measureSince.toISOString() : null;
   const afterBaseline = (iso: string | null | undefined) =>
@@ -239,6 +240,30 @@ export default async function UsagePanel() {
   const veRong = thuVe.filter((c) => !coLienHe(c));
   const veRongCoLinkedin = veRong.filter((c) => (c.linkedin_url ?? '').trim() !== '').length;
 
+  // ---- lien he duoc: con so DUY NHAT tra loi "tien co mua duoc gi khong" ----
+  //
+  // "Full rate (paid)" doi CA email LAN phone, nen no doc ra 29% va nghe nhu
+  // 71% con lai la vut di. Khong phai: mot nguoi chi co email van goi duoc,
+  // chi co LinkedIn van nhan tin duoc. Dem lai tren nguoi THAT SU khong con
+  // duong nao - khong mail, khong phone, khong LinkedIn - thi con 3%.
+  //
+  // De ca hai so canh nhau, dung bo cai nao. "Full rate" van la thuoc do chat
+  // luong du lieu SignalHire tra ve; "lien he duoc" moi la thuoc do viec duoc
+  // hay khong. Doc nham cai dau thanh cai sau la cho moi nguoi tuong ca he
+  // thong hong trong khi no dang chay tot.
+  const tonCredit = contacts.filter(byCredit);
+  const lienHeDuoc = tonCredit.filter(
+    (c) => coLienHe(c) || (c.linkedin_url ?? '').trim() !== '',
+  ).length;
+  const matTrang = tonCredit.length - lienHeDuoc;
+
+  // Nguoi lien he duoc tren moi credit da chi. Vuot 1.0 duoc vi SignalHire
+  // khong tinh tien ket qua ve rong - xem ghi chu o `thuVe`.
+  const thuVeDungDuoc = thuVe.filter(
+    (c) => coLienHe(c) || (c.linkedin_url ?? '').trim() !== '',
+  ).length;
+  const moiCredit = daChi > 0 ? thuVeDungDuoc / daChi : null;
+
   // ---- doi chieu voi so du SignalHire --------------------------------------
   //
   // Khong dung de bao cao, dung de BAT chuyen la. So du tut nhieu hon so sach
@@ -311,7 +336,7 @@ export default async function UsagePanel() {
       <h2 className="font-display text-base uppercase text-teal-deep">Credit spend and contact quality</h2>
       <p className="mt-1 text-xs text-ink-faint">
         Live from SignalHire and the contact table. Nothing on this screen is typed in by hand.
-        {mocHienThi && <> Spent, Gained and Came back empty all count from {mocHienThi}.</>}
+        {mocHienThi && <> Spent and Gained count from {mocHienThi}; Reachable covers every paid contact.</>}
       </p>
 
       {balance.error && (
@@ -332,7 +357,8 @@ export default async function UsagePanel() {
           hint={
             `Charged by this app across ${soLanChot} reveal${soLanChot === 1 ? '' : 's'}` +
             (mocHienThi ? ` since ${mocHienThi}` : '') +
-            (treoGiuCho ? `. ${treoGiuCho} more still held by stuck jobs.` : '.')
+            (treoGiuCho ? `. ${treoGiuCho} more still held by stuck jobs.` : '.') +
+            (moiCredit ? ` That is ${moiCredit.toFixed(2)} reachable contacts for every credit.` : '')
           }
         />
         <Tile
@@ -344,14 +370,13 @@ export default async function UsagePanel() {
           }
         />
         <Tile
-          label="Came back empty"
-          value={String(veRong.length)}
-          tone={veRong.length > gained ? 'warn' : undefined}
+          label="Reachable"
+          value={tonCredit.length ? `${pct(lienHeDuoc, tonCredit.length)}%` : '--'}
+          tone={matTrang > lienHeDuoc ? 'warn' : undefined}
           hint={
-            `No email and no phone, so nothing was charged` +
-            (veRongCoLinkedin
-              ? `. ${veRongCoLinkedin} of them still have a LinkedIn, so they are reachable.`
-              : '.')
+            `${lienHeDuoc} of ${tonCredit.length} paid contacts have an email, a phone or a LinkedIn. ` +
+            `${matTrang} came back with none of the three.` +
+            (veRong.length ? ` ${veRong.length} have no email or phone since ${mocHienThi ?? 'the baseline'}, and were not charged.` : '')
           }
         />
       </div>
