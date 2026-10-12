@@ -141,6 +141,17 @@ export default async function UsagePanel() {
     }),
   ]);
 
+  // Do phu brand: bao nhieu brand tren he thong da co it nhat mot dau moi.
+  // Day la con so manh nhat panel nay dang co ma truoc gio khong hien o dau -
+  // ca man hinh chi noi ve chat luong tung contact, khong noi duoc rang cong
+  // viec da phu gan het danh sach brand.
+  const [{ count: tongBrand }, { data: brandCoContact }] = await Promise.all([
+    db.from('brand').select('id', { count: 'exact', head: true }),
+    docTatCa<any>((tu, den) => db.from('brand').select('id, contact!inner(id)')
+      .order('id', { ascending: true }).range(tu, den)).then((r) => ({ data: r })),
+  ]);
+  const soBrandCoContact = new Set((brandCoContact ?? []).map((b: any) => b.id)).size;
+
   const balance = await readBalance((keyRow as any)?.value ?? null);
 
   const full = contacts.filter((c) => c.email && c.phone);
@@ -291,6 +302,15 @@ export default async function UsagePanel() {
     total: number; paid: number; free: number; bulk: number;
     appGenerated: number; manual: number;
     full: number; email: number; phone: number; none: number;
+    /**
+     * Con mot duong lien he nao khong - mail, phone HOAC LinkedIn.
+     *
+     * `none` o tren chi noi "khong mail khong phone", va cot do tung to do
+     * cho moi category. Nhung 474 trong 508 nguoi nhu vay VAN co LinkedIn,
+     * tuc van nhan tin duoc. To do ho len la bao ca bang dang chay hong trong
+     * khi so nguoi that su khong con duong nao chi la 34.
+     */
+    lienHe: number; tacDuong: number;
     // Full rate tinh RIENG tren contact by-credit - PHAI khop voi "Full rate
     // (paid)" cua sheet Credit & Contacts trong export (lib/creditSheet.ts).
     // "Complete" o bang duoi tinh tren MOI contact (ca free), nen mot category
@@ -310,7 +330,7 @@ export default async function UsagePanel() {
     const name = c?.brand?.category?.name ?? '(no category)';
     const g = byCat.get(name) ?? {
       total: 0, paid: 0, free: 0, bulk: 0, appGenerated: 0, manual: 0,
-      full: 0, email: 0, phone: 0, none: 0, paidFull: 0, rows: [],
+      full: 0, email: 0, phone: 0, none: 0, lienHe: 0, tacDuong: 0, paidFull: 0, rows: [],
     };
     g.total++;
     g.rows.push(c);
@@ -327,6 +347,8 @@ export default async function UsagePanel() {
     else if (c.email) g.email++;
     else if (c.phone) g.phone++;
     else g.none++;
+    if (coLienHe(c) || (c.linkedin_url ?? '').trim() !== '') g.lienHe++;
+    else g.tacDuong++;
     byCat.set(name, g);
   }
   const cats = [...byCat.entries()].sort((a, b) => b[1].total - a[1].total);
@@ -338,6 +360,12 @@ export default async function UsagePanel() {
         Live from SignalHire and the contact table. Nothing on this screen is typed in by hand.
         {mocHienThi && <> Spent and Gained count from {mocHienThi}; Reachable covers every paid contact.</>}
       </p>
+      {!!tongBrand && (
+        <p className="mt-1 text-xs text-ink-dim">
+          <b className="text-teal-deep">{soBrandCoContact} of {tongBrand} brands</b> on file have at
+          least one contact &mdash; {pct(soBrandCoContact, tongBrand)}% coverage.
+        </p>
+      )}
 
       {balance.error && (
         <p className="mt-3 rounded-lg border border-red-deep/30 bg-white px-4 py-3 text-sm text-red-deep">
@@ -399,7 +427,7 @@ export default async function UsagePanel() {
       )}
 
       <div className="mt-4 overflow-x-auto rounded-xl border border-line bg-white">
-        <table className="w-full min-w-[880px] text-sm">
+        <table className="w-full min-w-[960px] text-sm">
           <thead>
             <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-ink-faint">
               <th className="px-4 py-2.5 font-semibold">Category</th>
@@ -423,7 +451,12 @@ export default async function UsagePanel() {
               <th className="px-3 py-2.5 text-right font-semibold">Both</th>
               <th className="px-3 py-2.5 text-right font-semibold">Email only</th>
               <th className="px-3 py-2.5 text-right font-semibold">Phone only</th>
-              <th className="px-3 py-2.5 text-right font-semibold">Neither</th>
+              <th className="px-3 py-2.5 text-right font-semibold" title="No email, no phone and no LinkedIn - nobody at all can be reached. Different from the Neither column this replaced, which counted anyone missing email+phone even when a LinkedIn was there.">
+                No route
+              </th>
+              <th className="px-4 py-2.5 text-right font-semibold" title="Has an email, a phone or a LinkedIn - some way to start a conversation. The honest answer to whether the spend bought anything.">
+                Reachable
+              </th>
               <th className="px-4 py-2.5 text-right font-semibold" title="Both email and phone, over EVERY contact including free/hand-added ones. About list usability, not credit spend.">
                 Complete
               </th>
@@ -456,8 +489,11 @@ export default async function UsagePanel() {
                   <td className="px-3 py-2.5 text-right tabular-nums">{g.full}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-ink-dim">{g.email}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums text-ink-dim">{g.phone}</td>
-                  <td className={`px-3 py-2.5 text-right tabular-nums ${g.none ? 'text-red-deep' : 'text-ink-dim'}`}>
-                    {g.none}
+                  <td className={`px-3 py-2.5 text-right tabular-nums ${g.tacDuong ? 'text-red-deep' : 'text-ink-dim'}`}>
+                    {g.tacDuong}
+                  </td>
+                  <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-teal-deep">
+                    {pct(g.lienHe, g.total)}%
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -491,7 +527,10 @@ export default async function UsagePanel() {
                   {contacts.filter((c) => !c.email && c.phone).length}
                 </td>
                 <td className="px-3 py-2.5 text-right tabular-nums">
-                  {contacts.filter((c) => !c.email && !c.phone).length}
+                  {contacts.filter((c) => !coLienHe(c) && (c.linkedin_url ?? '').trim() === '').length}
+                </td>
+                <td className="px-4 py-2.5 text-right tabular-nums text-teal-deep">
+                  {pct(contacts.filter((c) => coLienHe(c) || (c.linkedin_url ?? '').trim() !== '').length, contacts.length)}%
                 </td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{pct(full.length, contacts.length)}%</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">
@@ -501,7 +540,7 @@ export default async function UsagePanel() {
             )}
             {cats.length === 0 && (
               <tr>
-                <td colSpan={14} className="px-4 py-6 text-center text-sm text-ink-dim">
+                <td colSpan={15} className="px-4 py-6 text-center text-sm text-ink-dim">
                   No contacts yet.
                 </td>
               </tr>
