@@ -16,7 +16,7 @@
 -- kenh. File nay don phan da ket lai truoc do.
 --
 -- ===========================================================================
--- 79 TRONG 93. CON 14 CAI KHONG XEP.
+-- CA 93. KHONG CON CAI NAO KET LAI.
 -- ===========================================================================
 --
 -- Khong cai nao duoc doan. Moi ten deu tra lai nguon that truoc khi xep, va
@@ -36,31 +36,35 @@
 -- Kingsun, Gaabor, Fujihome, HD Hyundai, Di Dong Viet, F.Studio deu co cho -
 -- truoc do tuong khong co nganh nao vua va dinh de chung lai.
 --
--- 14 cai con lai van KHONG xep, vi ba ly do:
+-- 14 cai cuoi, tra ky lai lan hai, va ba cai hoa ra co nganh that:
 --
---   a) RAC, khong phai brand (3):
---        Self-employed
---        Unsorted from LinkedIn links
---        linkedin.com/in/nhung-la-8b8315b4?originalSubdomain=vn
---      Hai cai dau la gia tri SignalHire tra ve va ten du phong cua duong dan
---      link. Cai thu ba la mot URL bi dung lam ten brand.
+--   Coretests   - kit xet nghiem nhanh y te -> Health & EL.
+--   Nesty       - dep/giay Viet Nam -> Fashion. Contact cua no khai cong ty
+--                 la "Coteccons" (xay dung), khong khop ten brand chut nao -
+--                 do la DU LIEU SAI, khong phai manh moi.
+--   lien a chau - cong ty van hanh chuoi Guardian, va "Guardian Vietnam" DA
+--                 nam san trong Health & EL.
 --
---   b) THAT SU KHONG CO NGANH NAO VUA (6):
---        fahasa, MCBooks, Nha Nam, Kim Dong, Kim Dong Publishing House - sach
---        va xuat ban. Khong co nganh nao gan.
---        Kymdan - nem. Khong phai FMCG (hang tieu dung nhanh), khong phai
---        dien may. Nhet dai vao la tao ra dung loai sai dang di don.
+-- 11 cai con lai vao nganh moi "Else":
 --
---   c) TRA KHONG RA (5):
---        Coretests, Nesty, lien a chau, FGH Group Co., Ltd., huyndai
---      "Nesty" co contact khai cong ty la Coteccons (xay dung) - khong khop
---      ten brand, co the la du lieu sai. "huyndai" la mot alias viet sai cua
---      Hyundai va trung voi HD Hyundai Electric.
+--   sach va xuat ban : fahasa, MCBooks, Nha Nam, Kim Dong,
+--                      Kim Dong Publishing House
+--   nem              : Kymdan - khong phai hang tieu dung nhanh, khong phai
+--                      dien may
+--   phu tung o to    : huyndai (that ra la Hyundai Mobis)
+--   tra khong ra     : FGH Group Co., Ltd.
+--   KHONG PHAI BRAND : Self-employed, Unsorted from LinkedIn links,
+--                      linkedin.com/in/nhung-la-...
 --
--- Xem Phan 3 de lay danh sach 14 cai do kem so contact.
+-- Ba dong cuoi la rac that su: hai cai dau la gia tri SignalHire tra ve va
+-- ten du phong cua duong dan link, cai thu ba la mot URL bi dung lam ten
+-- brand. Chung van duoc dua vao Else chu khong xoa o day, vi muc tieu cua
+-- file nay la lam Livestream con ZERO brand - xoa du lieu la viec rieng, can
+-- nhin ky va can mot file khac. "Unsorted from LinkedIn links" va URL kia
+-- khong co contact nao nen xoa duoc ngay; "Self-employed" con 1 contact.
 
 -- ---------------------------------------------------------------------------
--- PHAN 1 - CHI DOC. Xem truoc 79 dong se doi.
+-- PHAN 1 - CHI DOC. Xem truoc 93 dong se doi.
 -- ---------------------------------------------------------------------------
 
 with xep (ten_brand, ten_nganh) as (values
@@ -142,20 +146,44 @@ with xep (ten_brand, ten_nganh) as (values
     ('F.Studio By FPT', 'Health & EL'),
     ('KAO', 'FMCG'),
     ('kenvue', 'FMCG'),
-    ('masuto', 'FMCG')
+    ('masuto', 'FMCG'),
+    ('Coretests', 'Health & EL'),
+    ('liên á châu', 'Health & EL'),
+    ('Nesty', 'Fashion'),
+    ('fahasa', 'Else'),
+    ('MCBooks', 'Else'),
+    ('Nhã Nam', 'Else'),
+    ('Kim Đồng', 'Else'),
+    ('Kim Dong Publishing House', 'Else'),
+    ('Kymdan', 'Else'),
+    ('FGH Group Co., Ltd.', 'Else'),
+    ('huyndai', 'Else'),
+    ('Self-employed', 'Else'),
+    ('Unsorted from LinkedIn links', 'Else'),
+    ('linkedin.com/in/nhung-la-8b8315b4?originalSubdomain=vn', 'Else')
 )
 select x.ten_nganh as nganh_moi, count(*) as so_brand,
        string_agg(x.ten_brand, ', ' order by x.ten_brand) as cac_brand
 from xep x join brand b on b.name = x.ten_brand
 group by x.ten_nganh order by count(*) desc;
 
--- Tong phai ra 79. It hon nghia la co ten khong khop - bao lai, dung chay Phan 2.
+-- Tong phai ra 93. It hon nghia la co ten khong khop - bao lai, dung chay Phan 2.
 
 -- ---------------------------------------------------------------------------
--- PHAN 2 - DOI. Chay sau khi Phan 1 ra dung 79.
+-- PHAN 2 - DOI. Chay sau khi Phan 1 ra dung 93.
 -- ---------------------------------------------------------------------------
 
 begin;
+
+  -- Nganh "Else" cho nhung gi khong thuoc nganh nao dang co: sach va xuat
+  -- ban (fahasa, MCBooks, Nha Nam, Kim Dong), nem (Kymdan), phu tung o to
+  -- (huyndai la Hyundai Mobis), va vai dong khong tra ra duoc.
+  --
+  -- kind = 'product': no la mot nganh that de xep brand vao, khong phai kenh.
+  -- Co `slug` vi bang category dang co cot do cho moi dong.
+  insert into category (name, slug, active, kind)
+  select 'Else', 'else', true, 'product'
+  where not exists (select 1 from category where name = 'Else');
 
   with xep (ten_brand, ten_nganh) as (values
     ('82x', 'Beauty'),
@@ -236,7 +264,21 @@ begin;
     ('F.Studio By FPT', 'Health & EL'),
     ('KAO', 'FMCG'),
     ('kenvue', 'FMCG'),
-    ('masuto', 'FMCG')
+    ('masuto', 'FMCG'),
+    ('Coretests', 'Health & EL'),
+    ('liên á châu', 'Health & EL'),
+    ('Nesty', 'Fashion'),
+    ('fahasa', 'Else'),
+    ('MCBooks', 'Else'),
+    ('Nhã Nam', 'Else'),
+    ('Kim Đồng', 'Else'),
+    ('Kim Dong Publishing House', 'Else'),
+    ('Kymdan', 'Else'),
+    ('FGH Group Co., Ltd.', 'Else'),
+    ('huyndai', 'Else'),
+    ('Self-employed', 'Else'),
+    ('Unsorted from LinkedIn links', 'Else'),
+    ('linkedin.com/in/nhung-la-8b8315b4?originalSubdomain=vn', 'Else')
   )
   -- THU TU QUAN TRONG: ghi brand_channel TRUOC khi doi category_id. Sau khi
   -- doi thi khong con doc duoc kenh cu tu dong brand nua, va SOCOM se mat
@@ -326,13 +368,27 @@ begin;
     ('F.Studio By FPT', 'Health & EL'),
     ('KAO', 'FMCG'),
     ('kenvue', 'FMCG'),
-    ('masuto', 'FMCG')
+    ('masuto', 'FMCG'),
+    ('Coretests', 'Health & EL'),
+    ('liên á châu', 'Health & EL'),
+    ('Nesty', 'Fashion'),
+    ('fahasa', 'Else'),
+    ('MCBooks', 'Else'),
+    ('Nhã Nam', 'Else'),
+    ('Kim Đồng', 'Else'),
+    ('Kim Dong Publishing House', 'Else'),
+    ('Kymdan', 'Else'),
+    ('FGH Group Co., Ltd.', 'Else'),
+    ('huyndai', 'Else'),
+    ('Self-employed', 'Else'),
+    ('Unsorted from LinkedIn links', 'Else'),
+    ('linkedin.com/in/nhung-la-8b8315b4?originalSubdomain=vn', 'Else')
   )
   update brand b set category_id = c.id
     from xep x, category c
    where b.name = x.ten_brand and c.name = x.ten_nganh;
 
-  -- Phai ra 79. Khac thi roll back.
+  -- Phai ra 93. Khac thi roll back.
   select count(*) as da_doi from brand b
   join brand_channel bc on bc.brand_id = b.id
   join category c on c.id = b.category_id
@@ -341,15 +397,26 @@ begin;
 commit;
 
 -- ---------------------------------------------------------------------------
--- PHAN 3 - CHI DOC. 14 cai con lai, de nguoi quyet.
+-- PHAN 3 - KIEM LAI. Livestream phai con ZERO brand.
 -- ---------------------------------------------------------------------------
 
-select b.name,
-  (select count(*) from contact ct where ct.brand_id = b.id) as so_contact,
-  (select string_agg(distinct ct.company, ' / ')
-     from contact ct where ct.brand_id = b.id and ct.company is not null) as cong_ty_nguoi_ta_khai
+-- 3a. Phai ra 0 dong. Con dong nao la con brand ket duoi mot kenh.
+select b.name
 from brand b join category c on c.id = b.category_id and c.kind = 'channel'
-group by b.id, b.name order by 2 desc, b.name;
+order by b.name;
+
+-- 3b. Phan bo sau khi xep.
+select c.name as nganh, c.kind, count(b.id) as so_brand
+from category c left join brand b on b.category_id = c.id
+group by c.name, c.kind order by count(b.id) desc;
+
+-- 3c. Hai dong rac KHONG CON contact nao - xoa duoc ngay neu muon:
+--   delete from brand where name in (
+--     'Unsorted from LinkedIn links',
+--     'linkedin.com/in/nhung-la-8b8315b4?originalSubdomain=vn'
+--   ) and not exists (select 1 from contact ct where ct.brand_id = brand.id);
+--
+-- 'Self-employed' con 1 contact nen khong xoa o day - nhin contact do truoc.
 
 -- Va bon cap trung ten can gop, khong lien quan Livestream:
 --   Tai Ky Food - Flour Joint Stock / Tai Ky Food Flour JSC / Taiky Food
