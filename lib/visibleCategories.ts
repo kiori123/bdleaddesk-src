@@ -15,7 +15,10 @@ export async function visibleCategories(db: SupabaseClient) {
     db.rpc('my_categories'),
   ]);
 
-  let q = db.from('category').select('id, name').eq('active', true).order('name');
+  // `kind` di kem: man scan phai phan biet duoc NGAN SACH (kenh, vi du SOCOM)
+  // voi NGANH HANG. Chon mot kenh thi brand khong duoc xep vao chinh kenh do -
+  // xem socom_kenh_rieng.sql.
+  let q = db.from('category').select('id, name, kind').eq('active', true).order('name');
   if (!isAdminRes) q = q.in('id', myCats ?? []);
 
   const { data } = await q;

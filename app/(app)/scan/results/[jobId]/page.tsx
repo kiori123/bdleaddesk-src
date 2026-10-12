@@ -52,6 +52,7 @@ export default async function ResultsPage({
         jobId={jobId}
         categoryId={job.category_id}
         categoryName={(nganhTraTien as any)?.name ?? null}
+        productCategoryId={typeof p.productCategoryId === 'string' ? p.productCategoryId : null}
         initial={first}
         showChip={hasPrefs(p.prefs ?? {}) || Boolean(p.prefs?.chasing)}
       />

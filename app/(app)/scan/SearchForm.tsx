@@ -22,7 +22,7 @@ import { tachBrand } from '@/lib/brandInput';
  *   lib/signalhire.ts.
  */
 
-type Cat = { id: string; name: string };
+type Cat = { id: string; name: string; kind?: string | null };
 
 // Mot bo goi y DUY NHAT cho moi category - khong co danh sach rieng theo
 // nganh, vi PIC tu biet nganh cua minh can tu nao va bo goi y chi la diem
@@ -85,6 +85,18 @@ export default function SearchForm({
 
   const [brands, setBrands] = useState(mode === 'role' ? '' : '');
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? '');
+
+  /**
+   * Ngan sach dang chon co phai mot KENH khong (SOCOM), thay vi mot nganh hang.
+   *
+   * Kenh thi tra tien duoc nhung KHONG duoc lam nganh cua brand: mot dot day
+   * live cho Huggies van la Mom & Baby. Truoc day hai thu nay la mot, nen ai
+   * reveal truoc thi chot nganh cua brand vinh vien - 81 brand doanh nghiep
+   * that (Levi's, LG, Olay, Kenvue...) da ket lai duoi "Livestream" kieu do.
+   */
+  const laKenh = categories.find((c) => c.id === categoryId)?.kind === 'channel';
+  const dsNganh = categories.filter((c) => c.kind !== 'channel');
+  const [nganhBrandId, setNganhBrandId] = useState('');
   const [region, setRegion] = useState(VUNG_MAC_DINH);
 
   // Nhieu nhom chuc vu cung luc. Form n8n cu tick duoc nhieu, ban app dau tien
@@ -229,6 +241,12 @@ export default function SearchForm({
     const danhSach = brandsOverride ?? brandList;
     if (!danhSach.length) { setErr('Type at least one brand name.'); return; }
     if (!categoryId) { setErr('Pick the category this belongs to.'); return; }
+    // Chon kenh ma khong noi brand thuoc nganh nao thi brand lai roi vao chinh
+    // kenh do - dung cai da tao ra 81 brand ket duoi Livestream. Chan o day.
+    if (laKenh && !nganhBrandId) {
+      setErr('Pick the category these brands belong to, not just the budget.');
+      return;
+    }
     setConfirmScan(null);
 
     start(async () => {
@@ -237,6 +255,9 @@ export default function SearchForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           categoryId,
+          // Nganh THAT cua brand, khi ngan sach dang chon la mot kenh. Null o
+          // duong thuong: luc do categoryId vua la ngan sach vua la nganh.
+          productCategoryId: laKenh ? nganhBrandId : null,
           brands: danhSach.map((name) => ({ name, tier: 1 })),
           location: region,
           skipScanned,
@@ -412,11 +433,44 @@ export default function SearchForm({
 
       <div className="mb-4 grid gap-4 sm:grid-cols-2">
         <div>
-          <label className={label} htmlFor="cat">Category</label>
+          <label className={label} htmlFor="cat">
+            {laKenh ? 'Budget' : 'Category'}
+          </label>
           <select id="cat" className={input} value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}{c.kind === 'channel' ? ' (channel)' : ''}
+              </option>
+            ))}
           </select>
         </div>
+
+        {/*
+          Chon mot KENH thi phai noi them brand thuoc nganh nao.
+
+          Khong hoi thi brand roi vao chinh kenh do, va do la cach 81 brand
+          doanh nghiep that - Levi's, LG, Olay, Kenvue, AB InBev - ket lai
+          duoi "Livestream". damBaoBrand() upsert voi ignoreDuplicates nen ai
+          reveal truoc chot nganh vinh vien; khong ai sua lai duoc bang cach
+          quet lai.
+        */}
+        {laKenh && (
+          <div>
+            <label className={label} htmlFor="nganh">These brands belong to</label>
+            <select
+              id="nganh" className={input} value={nganhBrandId}
+              onChange={(e) => setNganhBrandId(e.target.value)}
+            >
+              <option value="">Pick a category</option>
+              {dsNganh.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <p className="mt-1 text-[11.5px] leading-snug text-ink-dim">
+              {categories.find((c) => c.id === categoryId)?.name} pays for the reveals. The brands
+              and their contacts are filed here, so the category owner sees them too &mdash; and you
+              keep seeing them because {categories.find((c) => c.id === categoryId)?.name} worked them.
+            </p>
+          </div>
+        )}
         <div>
           <label className={label} htmlFor="region">Where do they work</label>
           <select id="region" className={input} value={region} onChange={(e) => setRegion(e.target.value)}>

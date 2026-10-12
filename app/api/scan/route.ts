@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await db.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
 
-  const { categoryId, brands, location, role, keywords, linkedinUrls, prefs, skipScanned }
+  const { categoryId, productCategoryId, brands, location, role, keywords, linkedinUrls, prefs, skipScanned }
     = await req.json();
   if (!categoryId) return NextResponse.json({ error: 'Pick a category first.' }, { status: 400 });
   if (!Array.isArray(brands) || brands.length === 0) {
@@ -52,6 +52,37 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { error: "That category isn't yours. Pick one of your own categories to scan under." },
       { status: 403 });
+  }
+
+  /**
+   * Nganh THAT cua brand, khi `categoryId` la mot KENH (SOCOM).
+   *
+   * Hai thu khac nhau va phai di rieng:
+   *   categoryId        - NGAN SACH nao tra tien
+   *   productCategoryId - brand thuoc NGANH nao
+   *
+   * Gop lam mot la cach 81 brand doanh nghiep that ket lai duoi "Livestream":
+   * damBaoBrand() upsert voi ignoreDuplicates nen ai reveal truoc chot nganh
+   * vinh vien, va quet lai dung nganh cung khong sua duoc.
+   *
+   * Kiem o day chu khong tin form: form co the cu, co the bi sua, va mot gia
+   * tri sai o day thi hong du lieu chu khong hong man hinh.
+   */
+  const nganhBrandId = typeof productCategoryId === 'string' && productCategoryId.trim()
+    ? productCategoryId.trim() : null;
+
+  if (nganhBrandId) {
+    const { data: ds } = await db.from('category')
+      .select('id, kind').in('id', [categoryId, nganhBrandId]);
+    const nganh = (ds ?? []).find((c: any) => c.id === nganhBrandId);
+    if (!nganh) {
+      return NextResponse.json({ error: 'That category does not exist.' }, { status: 400 });
+    }
+    if ((nganh as any).kind === 'channel') {
+      return NextResponse.json(
+        { error: 'Brands cannot be filed under a channel. Pick a product category.' },
+        { status: 400 });
+    }
   }
 
   // role nhan ca chuoi lan mang, vi ban cu gui mot chuoi. Sau khi moi nguoi da
@@ -237,6 +268,9 @@ export async function POST(req: NextRequest) {
       // hieu duoc vi sao thieu brand.
       payload: {
         brands, location, role, linkedinUrls,
+        // Nganh that cua brand, de man ket qua va /api/reveal dung lai dung
+        // gia tri cua CHINH lan quet nay chu khong doc lai form hien tai.
+        productCategoryId: nganhBrandId,
         prefs: { ...(prefs ?? {}), keywords: keywords ?? null },
         scanned: brandsCanQuet.map((b: any) => b?.name),
         skipped: tenBiBoQua,

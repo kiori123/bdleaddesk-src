@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await db.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 });
 
-  const { categoryId, brandId, brandName, uids, source } = await req.json();
+  const { categoryId, productCategoryId, brandId, brandName, uids, source } = await req.json();
 
   if (!categoryId) {
     return NextResponse.json({ error: 'Pick a category first.' }, { status: 400 });
@@ -60,6 +60,35 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  /**
+   * Nganh THAT cua brand, khi `categoryId` la mot KENH (SOCOM).
+   *
+   *   categoryId        - NGAN SACH nao tra tien   (SOCOM tra duoc)
+   *   nganhBrandId      - brand thuoc NGANH nao    (luon la nganh that)
+   *
+   * Gop lam mot la cach 81 brand doanh nghiep that - Levi's, LG, Olay,
+   * Kenvue, AB InBev - ket lai duoi "Livestream": damBaoBrand() upsert voi
+   * ignoreDuplicates nen ai reveal truoc chot nganh vinh vien.
+   *
+   * Kiem lai o day chu khong tin client: mot tab cu van gui duoc payload cu,
+   * va mot gia tri sai o day lam hong du lieu chu khong hong man hinh.
+   */
+  const nganhBrandId = typeof productCategoryId === 'string' && productCategoryId.trim()
+    ? productCategoryId.trim() : null;
+
+  if (nganhBrandId) {
+    const { data: ng } = await db.from('category')
+      .select('id, kind').eq('id', nganhBrandId).maybeSingle();
+    if (!ng) {
+      return NextResponse.json({ error: 'That category does not exist.' }, { status: 400 });
+    }
+    if ((ng as any).kind === 'channel') {
+      return NextResponse.json(
+        { error: 'Brands cannot be filed under a channel. Pick a product category.' },
+        { status: 400 });
+    }
+  }
+
   // Tu day tro di co the tieu credit va tao job that. Boc try/catch quanh
   // TOAN BO phan con lai: truoc day mot loi khong luong truoc (DB loi la, hoac
   // SignalHire treo qua lau) se lam function crash giua chung, khong bao gio
@@ -83,11 +112,32 @@ export async function POST(req: NextRequest) {
    * khong tao moi, nen category duoc giu.
    */
   async function damBaoBrand(ten: string) {
+    // Nganh cua brand la `nganhBrandId` khi co, KHONG phai `categoryId`:
+    // categoryId co the la mot kenh, va mot kenh khong duoc lam nganh cua
+    // brand. Khong co thi categoryId vua la ngan sach vua la nganh, nhu cu.
     const { error } = await admin
       .from('brand')
-      .upsert({ name_key: nameKey(ten), name: ten, category_id: categoryId },
+      .upsert({ name_key: nameKey(ten), name: ten, category_id: nganhBrandId ?? categoryId },
               { onConflict: 'name_key', ignoreDuplicates: true });
     if (error) console.error('[reveal] khong dam bao duoc brand:', error.message);
+  }
+
+  /**
+   * Ghi lai "kenh nay da lam brand nay".
+   *
+   * Khong co dong nay thi SOCOM mat quyen xem chinh brand ho vua lam: sau khi
+   * brand ve Mom & Baby, `brand_read` chi cho chu Mom & Baby thay no. Policy
+   * co san mot ve "hoac mot kenh cua toi da lam brand nay" (brand_qua_kenh,
+   * xem socom_kenh_rieng.sql), va day la cho nuoi ve do.
+   *
+   * Hong o day khong duoc lam hong ca lan reveal - contact da ve roi.
+   */
+  async function ghiKenhLamBrand(brandIdThat: string) {
+    if (!nganhBrandId || !categoryId) return;   // khong qua kenh thi khong co gi de ghi
+    const { error } = await admin.from('brand_channel')
+      .upsert({ brand_id: brandIdThat, category_id: categoryId },
+              { onConflict: 'brand_id,category_id', ignoreDuplicates: true });
+    if (error) console.error('[reveal] khong ghi duoc brand_channel:', error.message);
   }
 
   // Duong link thi chua biet brand, phai doi reveal tra ve moi biet. Duong con
@@ -252,6 +302,10 @@ export async function POST(req: NextRequest) {
 
   let saved = 0;
   if (brandRow?.id) {
+    // Ghi dau vet kenh NGAY khi biet brand, truoc vong luu contact: neu vong
+    // do hong giua chung thi SOCOM van con quyen xem brand de vao xem lai.
+    await ghiKenhLamBrand(brandRow.id);
+
     for (const person of out.people) {
       const row = {
         brand_id: brandRow.id,
@@ -271,6 +325,9 @@ export async function POST(req: NextRequest) {
           : ((moiUidLaLink || uidDaDan.has(String(person.uid))) ? 'pasted_linkedin' : 'signalhire'),
         external_uid: person.uid || null,
         revealed_by: user.id,
+        // Kenh nao tim ra nguoi nay. NULL o duong thuong - khong dat mac dinh,
+        // vi mot gia tri mac dinh se gan nhan cho ca nhung dong khong qua kenh.
+        channel_id: nganhBrandId ? categoryId : null,
       };
 
       // contact_uid_idx la partial index nen ON CONFLICT khong tro toi duoc.

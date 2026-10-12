@@ -119,3 +119,63 @@ test('a deactivated admin with no profile_category row -> rejected', async () =>
   const allowed = await canUseCategory(db(), 'inactiveAdmin', 'catA');
   assert.equal(allowed, false);
 });
+
+// --- Kenh khong bao gio duoc lam NGANH cua brand -------------------------
+//
+// "Livestream" la kenh (SOCOM), khong phai nganh hang. Mot dot day live cho
+// Huggies van la Mom & Baby. Gop hai thu lam mot la cach 81 brand doanh
+// nghiep that - Levi's, LG, Olay, Kenvue, AB InBev - ket lai duoi Livestream:
+// damBaoBrand() upsert voi ignoreDuplicates nen ai reveal truoc chot nganh
+// vinh vien, va quet lai dung nganh cung khong sua duoc.
+//
+// Kiem tren SOURCE, giong cac test thu tu o tren: cai can giu la BAT BIEN,
+// va no nam o mot dong duy nhat de sai.
+
+test('damBaoBrand xep brand theo NGANH, khong theo ngan sach dang tra tien', () => {
+  const src = readSource('../app/api/reveal/route.ts');
+
+  assert.ok(
+    src.includes('category_id: nganhBrandId ?? categoryId'),
+    'brand phai lay nganh that (nganhBrandId) truoc, chi lui ve categoryId khi khong co',
+  );
+  assert.ok(
+    !/upsert\(\{ name_key: nameKey\(ten\), name: ten, category_id: categoryId \}/.test(src),
+    'khong duoc quay lai dung thang categoryId - do co the la mot kenh',
+  );
+});
+
+test('ca scan lan reveal deu tu choi khi brand bi xep vao mot kenh', () => {
+  // Chan o CA HAI duong: mot tab cu van gui duoc payload cu, va form thi sua
+  // duoc tu phia trinh duyet.
+  for (const f of ['../app/api/scan/route.ts', '../app/api/reveal/route.ts']) {
+    const src = readSource(f);
+    assert.ok(
+      src.includes("kind === 'channel'"),
+      `${f} phai kiem kind === 'channel' truoc khi nhan lam nganh cua brand`,
+    );
+    assert.ok(
+      /Brands cannot be filed under a channel/.test(src),
+      `${f} phai noi ro vi sao tu choi`,
+    );
+  }
+});
+
+test('reveal ghi brand_channel TRUOC khi luu contact', () => {
+  // Khong co dong brand_channel thi SOCOM mat quyen xem chinh brand ho vua
+  // lam, vi brand_read chi con ve "nganh cua toi". Ghi truoc vong luu contact
+  // de vong do hong giua chung thi quyen xem van con.
+  const src = readSource('../app/api/reveal/route.ts');
+  const iGhiKenh = src.indexOf('await ghiKenhLamBrand(brandRow.id)');
+  const iLuuContact = src.indexOf('for (const person of out.people)');
+  assert.ok(iGhiKenh > -1, 'khong thay cho ghi brand_channel');
+  assert.ok(iLuuContact > -1, 'khong thay vong luu contact');
+  assert.ok(iGhiKenh < iLuuContact, 'brand_channel phai duoc ghi truoc vong luu contact');
+});
+
+test('contact duoc dong dau kenh, va chi khi that su di qua kenh', () => {
+  const src = readSource('../app/api/reveal/route.ts');
+  assert.ok(
+    src.includes('channel_id: nganhBrandId ? categoryId : null'),
+    'channel_id phai la null o duong thuong - mot mac dinh se gan nhan sai cho moi dong',
+  );
+});

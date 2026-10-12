@@ -264,9 +264,11 @@ function Giua({ children }: { children: React.ReactNode }) {
 }
 
 export default function Results({
-  jobId, categoryId, categoryName, initial, showChip,
+  jobId, categoryId, categoryName, productCategoryId, initial, showChip,
 }: {
   jobId: string; categoryId: string | null; categoryName: string | null;
+  /** Nganh that cua brand khi categoryId la mot kenh - xem socom_kenh_rieng.sql. */
+  productCategoryId: string | null;
   initial: JobView; showChip: boolean;
 }) {
   const [view, setView] = useState<JobView>(initial);
@@ -384,6 +386,7 @@ export default function Results({
             categoryId,
             brandId: list[0].brand_id,
             brandName,
+            productCategoryId,
             uids,
           }),
         });
