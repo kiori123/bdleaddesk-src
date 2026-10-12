@@ -21,3 +21,5 @@ build/
 *.log
 .DS_Store
 .turbo/
+
+.sql-ketqua.txt

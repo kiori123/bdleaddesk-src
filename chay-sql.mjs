@@ -22,7 +22,7 @@
 //   - Gui NGUYEN file trong mot lan goi, de `begin;/commit;` trong file giu
 //     dung nghia. Cat nho ra thanh tung cau se pha transaction.
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import { stdin, stdout, argv, env, exit } from 'node:process';
 

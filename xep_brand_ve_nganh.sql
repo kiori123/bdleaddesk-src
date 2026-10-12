@@ -172,20 +172,37 @@ group by x.ten_nganh order by count(*) desc;
 -- ---------------------------------------------------------------------------
 -- PHAN 2 - DOI. Chay sau khi Phan 1 ra dung 93.
 -- ---------------------------------------------------------------------------
+--
+-- KHONG dung begin;/commit;. Ban truoc co, va day la mot lenh goi HTTP qua
+-- Management API chu khong phai mot phien psql - API tu boc transaction cua
+-- no, nen mot BEGIN long vao ben trong bi tu choi.
+--
+-- Khong can transaction nua, vi buoc 2b da la MOT CAU LENH duy nhat: CTE ghi
+-- du lieu trong Postgres chay dung mot lan va cung nam trong mot transaction
+-- ngam voi cau lenh chinh. Hoac ca hai cung vao, hoac ca hai cung khong.
+--
+-- Chay 2a truoc, roi 2b.
 
-begin;
+-- 2a. Tao nganh "Else" cho nhung gi khong thuoc nganh nao dang co: sach va
+--     xuat ban, nem (Kymdan), phu tung o to (huyndai that ra la Hyundai
+--     Mobis), va vai dong khong tra ra duoc.
+--
+--     kind = 'product' vi no la nganh that de xep brand vao, khong phai kenh.
+--     Chay lai nhieu lan khong sao - `where not exists` lo phan do.
+insert into category (name, slug, active, kind)
+select 'Else', 'else', true, 'product'
+where not exists (select 1 from category where name = 'Else');
 
-  -- Nganh "Else" cho nhung gi khong thuoc nganh nao dang co: sach va xuat
-  -- ban (fahasa, MCBooks, Nha Nam, Kim Dong), nem (Kymdan), phu tung o to
-  -- (huyndai la Hyundai Mobis), va vai dong khong tra ra duoc.
-  --
-  -- kind = 'product': no la mot nganh that de xep brand vao, khong phai kenh.
-  -- Co `slug` vi bang category dang co cot do cho moi dong.
-  insert into category (name, slug, active, kind)
-  select 'Else', 'else', true, 'product'
-  where not exists (select 1 from category where name = 'Else');
-
-  with xep (ten_brand, ten_nganh) as (values
+-- 2b. Ghi dau vet kenh RO I doi nganh, trong cung mot cau lenh.
+--
+--     THU TU QUAN TRONG va duoc bao dam boi chinh cau lenh nay: CTE `ghi` doc
+--     `b.category_id` o trang thai TRUOC khi update chay, nen no luu dung
+--     kenh cu. Tach ra hai cau lenh thi cau thu hai se xoa mat thu cau thu
+--     nhat can doc.
+--
+--     Khong ghi brand_channel thi SOCOM mat quyen xem chinh brand ho vua lam:
+--     sau khi brand ve Mom & Baby, brand_read chi con ve "nganh cua toi".
+with xep (ten_brand, ten_nganh) as (values
     ('82x', 'Beauty'),
     ('evoluderm', 'Beauty'),
     ('Lanbena', 'Beauty'),
@@ -279,122 +296,20 @@ begin;
     ('Self-employed', 'Else'),
     ('Unsorted from LinkedIn links', 'Else'),
     ('linkedin.com/in/nhung-la-8b8315b4?originalSubdomain=vn', 'Else')
-  )
-  -- THU TU QUAN TRONG: ghi brand_channel TRUOC khi doi category_id. Sau khi
-  -- doi thi khong con doc duoc kenh cu tu dong brand nua, va SOCOM se mat
-  -- quyen xem brand ho vua lam (brand_read chi con ve "nganh cua toi").
+),
+ghi as (
   insert into brand_channel (brand_id, category_id)
   select b.id, b.category_id
   from xep x join brand b on b.name = x.ten_brand
   where b.category_id is not null
-  on conflict do nothing;
+  on conflict do nothing
+  returning 1
+)
+update brand b set category_id = c.id
+  from xep x, category c
+ where b.name = x.ten_brand and c.name = x.ten_nganh;
 
-  with xep (ten_brand, ten_nganh) as (values
-    ('82x', 'Beauty'),
-    ('evoluderm', 'Beauty'),
-    ('Lanbena', 'Beauty'),
-    ('Lemonade', 'Beauty'),
-    ('Moroccanoil', 'Beauty'),
-    ('Naruko', 'Beauty'),
-    ('olay', 'Beauty'),
-    ('Phấn Nụ Hoàng Cung', 'Beauty'),
-    ('SVR', 'Beauty'),
-    ('THORAKAO COSMETICS LTD.,', 'Beauty'),
-    ('Wonjin', 'Beauty'),
-    ('kosmen', 'Beauty'),
-    ('ファイントゥデイ FineToday Co., Ltd.', 'Beauty'),
-    ('Keyshu', 'Beauty'),
-    ('C-Store Vietnam', 'Beauty'),
-    ('Ăn Cùng Bà Tuyết', 'F&B'),
-    ('AB InBev Southeast Asia', 'F&B'),
-    ('budweiser', 'F&B'),
-    ('Hạt Dinh Dưỡng Tây Nguyên', 'F&B'),
-    ('goody', 'F&B'),
-    ('i.soup', 'F&B'),
-    ('Lothamilk', 'F&B'),
-    ('oatside', 'F&B'),
-    ('sanest', 'F&B'),
-    ('Star Kombucha', 'F&B'),
-    ('Tai Ky Food - Flour Joint Stock', 'F&B'),
-    ('Tai Ky Food Flour JSC', 'F&B'),
-    ('Taiky Food', 'F&B'),
-    ('Thien Huong Food Joint Stock Company', 'F&B'),
-    ('Thien Huong Food JSC', 'F&B'),
-    ('Vietinter', 'F&B'),
-    ('Cchat Clothes', 'Fashion'),
-    ('Cocomay', 'Fashion'),
-    ('Hagoo', 'Fashion'),
-    ('Levi''s', 'Fashion'),
-    ('Nón Sơn', 'Fashion'),
-    ('Routine Vietnam', 'Fashion'),
-    ('semir', 'Fashion'),
-    ('Sixdo', 'Fashion'),
-    ('Thiều Hoa', 'Fashion'),
-    ('Tingoan', 'Fashion'),
-    ('halita', 'Fashion'),
-    ('Bemine', 'Fashion'),
-    ('Rechic', 'Fashion'),
-    ('Bbstore''S', 'Fashion'),
-    ('Libe', 'Fashion'),
-    ('Embes', 'Fashion'),
-    ('rabity', 'Fashion'),
-    ('Khatoco', 'Fashion'),
-    ('Kính Mắt Anna', 'Fashion'),
-    ('Visecret', 'Fashion'),
-    ('Bebechic', 'Mom & Baby'),
-    ('D - Nee', 'Mom & Baby'),
-    ('Emoon', 'Mom & Baby'),
-    ('vitadiary', 'Mom & Baby'),
-    ('Mykingdom', 'Mom & Baby'),
-    ('Best Nutrition', 'Health & EL'),
-    ('Codeage', 'Health & EL'),
-    ('Fresheen Health', 'Health & EL'),
-    ('Brushie', 'Health & EL'),
-    ('Tranyoo', 'Health & EL'),
-    ('GoChek', 'Health & EL'),
-    ('JETZT', 'Health & EL'),
-    ('dodoto', 'Health & EL'),
-    ('HECATECH', 'Health & EL'),
-    ('LG', 'Health & EL'),
-    ('Casio', 'Health & EL'),
-    ('Nagakawa', 'Health & EL'),
-    ('Imou', 'Health & EL'),
-    ('Samono', 'Health & EL'),
-    ('Kingsun', 'Health & EL'),
-    ('Gaabor', 'Health & EL'),
-    ('Fujihome', 'Health & EL'),
-    ('HD Hyundai Electric Co., Ltd.', 'Health & EL'),
-    ('Di Động Việt', 'Health & EL'),
-    ('F.Studio By FPT', 'Health & EL'),
-    ('KAO', 'FMCG'),
-    ('kenvue', 'FMCG'),
-    ('masuto', 'FMCG'),
-    ('Coretests', 'Health & EL'),
-    ('liên á châu', 'Health & EL'),
-    ('Nesty', 'Fashion'),
-    ('fahasa', 'Else'),
-    ('MCBooks', 'Else'),
-    ('Nhã Nam', 'Else'),
-    ('Kim Đồng', 'Else'),
-    ('Kim Dong Publishing House', 'Else'),
-    ('Kymdan', 'Else'),
-    ('FGH Group Co., Ltd.', 'Else'),
-    ('huyndai', 'Else'),
-    ('Self-employed', 'Else'),
-    ('Unsorted from LinkedIn links', 'Else'),
-    ('linkedin.com/in/nhung-la-8b8315b4?originalSubdomain=vn', 'Else')
-  )
-  update brand b set category_id = c.id
-    from xep x, category c
-   where b.name = x.ten_brand and c.name = x.ten_nganh;
-
-  -- Phai ra 93. Khac thi roll back.
-  select count(*) as da_doi from brand b
-  join brand_channel bc on bc.brand_id = b.id
-  join category c on c.id = b.category_id
-  where c.kind = 'product';
-
-commit;
+-- Phai bao da doi 93 dong.
 
 -- ---------------------------------------------------------------------------
 -- PHAN 3 - KIEM LAI. Livestream phai con ZERO brand.
