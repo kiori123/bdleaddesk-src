@@ -1,47 +1,66 @@
 -- Xep lai brand tu "Livestream" ve dung nganh hang cua chung.
 --
--- Chay sau socom_kenh_rieng.sql (can bang brand_channel va cot category.kind).
+-- Chay sau socom_kenh_rieng.sql.
 --   node chay-sql.mjs xep_brand_ve_nganh.sql
 --
 -- ===========================================================================
 -- VI SAO
 -- ===========================================================================
 --
--- "Livestream" la KENH (SOCOM), khong phai nganh hang. Nhung vi no tung nam
--- chung bang `category`, va `damBaoBrand()` upsert voi ignoreDuplicates - ai
--- reveal truoc chot nganh vinh vien - nen 93 brand doanh nghiep that da ket
--- lai duoi do: Levi's, LG, Olay, Kenvue, AB InBev, Casio, Kymdan, Fahasa.
+-- "Livestream" la KENH (SOCOM), khong phai nganh hang. Vi no tung nam chung
+-- bang `category`, va `damBaoBrand()` upsert voi ignoreDuplicates - ai reveal
+-- truoc chot nganh vinh vien - nen 93 brand doanh nghiep that da ket lai duoi
+-- do: Levi's, LG, Olay, Kenvue, AB InBev, Casio, Kymdan, Fahasa.
 --
--- Nguon da duoc vit (form scan bat chon nganh rieng khi tra bang ngan sach
--- kenh). File nay don phan da ket lai truoc do.
---
--- ===========================================================================
--- CHI 46 TRONG 93. CON LAI KHONG TU DONG DUOC.
--- ===========================================================================
---
--- 46 brand duoi day la nhung cai doc ten la biet nganh: Olay la Beauty,
--- Levi's la Fashion, Budweiser la F&B. Khong doan cai nao.
---
--- 47 brand con lai KHONG dong vao day, vi hai ly do khac nhau:
---
---   a) KHONG CO NGANH NAO VUA. Danh sach nganh hien co la Mom & Baby, FMCG,
---      F&B, Beauty, Fashion, Health & EL, China Project. Khong co cho cho
---      dien may (LG, Casio, Nagakawa, Imou, Samono, Kingsun, Gaabor,
---      Fujihome, HD Hyundai), ban le (Di Dong Viet, F.Studio, fahasa),
---      xuat ban (MCBooks, Nha Nam, Kim Dong), do choi (Mykingdom), hay
---      nem (Kymdan). Nhet dai vao FMCG la tao ra dung loai sai ma ca dot
---      nay di don. Can mot nganh moi, va do la quyet dinh cua nguoi.
---
---   b) TOI KHONG BIET BRAND DO. Keyshu, halita, masuto, Emoon, dodoto,
---      Libe, Bbstore'S, Embes, Bemine, Rechic, HECATECH, JETZT, GoChek,
---      Coretests, C-Store, FGH Group, Nesty, lien a chau. Doan la xep sai.
---
--- Xem Phan 3 de lay danh sach day du cua 47 cai do.
+-- Nguon da duoc vit: form scan bat chon nganh rieng khi tra bang ngan sach
+-- kenh. File nay don phan da ket lai truoc do.
 --
 -- ===========================================================================
+-- 79 TRONG 93. CON 14 CAI KHONG XEP.
+-- ===========================================================================
+--
+-- Khong cai nao duoc doan. Moi ten deu tra lai nguon that truoc khi xep, va
+-- vai cai hoa ra khac han phong doan ban dau:
+--
+--   halita   - KHONG phai thiet bi dien. La giay dep da nam -> Fashion.
+--   masuto   - KHONG phai thoi trang. La hoa pham tay rua -> FMCG.
+--   Brushie  - ban chai dien cua Smilee, va "Cong ty Co phan Smilee Viet Nam"
+--              DA nam san trong Health & EL.
+--   HECATECH - cham soc suc khoe phu nu (coc nguyet san, dung dich ve sinh),
+--              cung nhom voi Lavima da co trong Health & EL.
+--   JETZT, dodoto - deu la may hut bui, cung nhom voi ecovacs da co san.
+--
+-- Mot phat hien doi ca cach xep: "Health & EL" la Health & ELECTRONICS. No
+-- dang chua Samsung, Epson, sharp, De'Longhi, ecovacs, EZVIZ, western
+-- digital, AQUA, Omron, ClickBuy. Nen LG, Casio, Nagakawa, Imou, Samono,
+-- Kingsun, Gaabor, Fujihome, HD Hyundai, Di Dong Viet, F.Studio deu co cho -
+-- truoc do tuong khong co nganh nao vua va dinh de chung lai.
+--
+-- 14 cai con lai van KHONG xep, vi ba ly do:
+--
+--   a) RAC, khong phai brand (3):
+--        Self-employed
+--        Unsorted from LinkedIn links
+--        linkedin.com/in/nhung-la-8b8315b4?originalSubdomain=vn
+--      Hai cai dau la gia tri SignalHire tra ve va ten du phong cua duong dan
+--      link. Cai thu ba la mot URL bi dung lam ten brand.
+--
+--   b) THAT SU KHONG CO NGANH NAO VUA (6):
+--        fahasa, MCBooks, Nha Nam, Kim Dong, Kim Dong Publishing House - sach
+--        va xuat ban. Khong co nganh nao gan.
+--        Kymdan - nem. Khong phai FMCG (hang tieu dung nhanh), khong phai
+--        dien may. Nhet dai vao la tao ra dung loai sai dang di don.
+--
+--   c) TRA KHONG RA (5):
+--        Coretests, Nesty, lien a chau, FGH Group Co., Ltd., huyndai
+--      "Nesty" co contact khai cong ty la Coteccons (xay dung) - khong khop
+--      ten brand, co the la du lieu sai. "huyndai" la mot alias viet sai cua
+--      Hyundai va trung voi HD Hyundai Electric.
+--
+-- Xem Phan 3 de lay danh sach 14 cai do kem so contact.
 
 -- ---------------------------------------------------------------------------
--- PHAN 1 - CHI DOC. Xem truoc 46 dong se doi.
+-- PHAN 1 - CHI DOC. Xem truoc 79 dong se doi.
 -- ---------------------------------------------------------------------------
 
 with xep (ten_brand, ten_nganh) as (values
@@ -58,6 +77,8 @@ with xep (ten_brand, ten_nganh) as (values
     ('Wonjin', 'Beauty'),
     ('kosmen', 'Beauty'),
     ('ファイントゥデイ FineToday Co., Ltd.', 'Beauty'),
+    ('Keyshu', 'Beauty'),
+    ('C-Store Vietnam', 'Beauty'),
     ('Ăn Cùng Bà Tuyết', 'F&B'),
     ('AB InBev Southeast Asia', 'F&B'),
     ('budweiser', 'F&B'),
@@ -84,30 +105,54 @@ with xep (ten_brand, ten_nganh) as (values
     ('Sixdo', 'Fashion'),
     ('Thiều Hoa', 'Fashion'),
     ('Tingoan', 'Fashion'),
+    ('halita', 'Fashion'),
+    ('Bemine', 'Fashion'),
+    ('Rechic', 'Fashion'),
+    ('Bbstore''S', 'Fashion'),
+    ('Libe', 'Fashion'),
+    ('Embes', 'Fashion'),
+    ('rabity', 'Fashion'),
+    ('Khatoco', 'Fashion'),
+    ('Kính Mắt Anna', 'Fashion'),
+    ('Visecret', 'Fashion'),
     ('Bebechic', 'Mom & Baby'),
     ('D - Nee', 'Mom & Baby'),
+    ('Emoon', 'Mom & Baby'),
+    ('vitadiary', 'Mom & Baby'),
+    ('Mykingdom', 'Mom & Baby'),
     ('Best Nutrition', 'Health & EL'),
     ('Codeage', 'Health & EL'),
     ('Fresheen Health', 'Health & EL'),
+    ('Brushie', 'Health & EL'),
+    ('Tranyoo', 'Health & EL'),
+    ('GoChek', 'Health & EL'),
+    ('JETZT', 'Health & EL'),
+    ('dodoto', 'Health & EL'),
+    ('HECATECH', 'Health & EL'),
+    ('LG', 'Health & EL'),
+    ('Casio', 'Health & EL'),
+    ('Nagakawa', 'Health & EL'),
+    ('Imou', 'Health & EL'),
+    ('Samono', 'Health & EL'),
+    ('Kingsun', 'Health & EL'),
+    ('Gaabor', 'Health & EL'),
+    ('Fujihome', 'Health & EL'),
+    ('HD Hyundai Electric Co., Ltd.', 'Health & EL'),
+    ('Di Động Việt', 'Health & EL'),
+    ('F.Studio By FPT', 'Health & EL'),
     ('KAO', 'FMCG'),
-    ('kenvue', 'FMCG')
+    ('kenvue', 'FMCG'),
+    ('masuto', 'FMCG')
 )
-select
-  x.ten_brand,
-  c_cu.name  as nganh_hien_tai,
-  x.ten_nganh as nganh_moi,
-  (select count(*) from contact ct where ct.brand_id = b.id) as so_contact
-from xep x
-join brand b on b.name = x.ten_brand
-left join category c_cu on c_cu.id = b.category_id
-left join category c_moi on c_moi.name = x.ten_nganh
-order by x.ten_nganh, x.ten_brand;
+select x.ten_nganh as nganh_moi, count(*) as so_brand,
+       string_agg(x.ten_brand, ', ' order by x.ten_brand) as cac_brand
+from xep x join brand b on b.name = x.ten_brand
+group by x.ten_nganh order by count(*) desc;
 
--- Phai ra dung 46 dong, cot nganh_hien_tai deu la Livestream.
--- It hon 46 nghia la co ten brand khong khop - bao lai, dung chay Phan 2.
+-- Tong phai ra 79. It hon nghia la co ten khong khop - bao lai, dung chay Phan 2.
 
 -- ---------------------------------------------------------------------------
--- PHAN 2 - DOI. Chay sau khi Phan 1 ra dung.
+-- PHAN 2 - DOI. Chay sau khi Phan 1 ra dung 79.
 -- ---------------------------------------------------------------------------
 
 begin;
@@ -126,6 +171,8 @@ begin;
     ('Wonjin', 'Beauty'),
     ('kosmen', 'Beauty'),
     ('ファイントゥデイ FineToday Co., Ltd.', 'Beauty'),
+    ('Keyshu', 'Beauty'),
+    ('C-Store Vietnam', 'Beauty'),
     ('Ăn Cùng Bà Tuyết', 'F&B'),
     ('AB InBev Southeast Asia', 'F&B'),
     ('budweiser', 'F&B'),
@@ -152,21 +199,51 @@ begin;
     ('Sixdo', 'Fashion'),
     ('Thiều Hoa', 'Fashion'),
     ('Tingoan', 'Fashion'),
+    ('halita', 'Fashion'),
+    ('Bemine', 'Fashion'),
+    ('Rechic', 'Fashion'),
+    ('Bbstore''S', 'Fashion'),
+    ('Libe', 'Fashion'),
+    ('Embes', 'Fashion'),
+    ('rabity', 'Fashion'),
+    ('Khatoco', 'Fashion'),
+    ('Kính Mắt Anna', 'Fashion'),
+    ('Visecret', 'Fashion'),
     ('Bebechic', 'Mom & Baby'),
     ('D - Nee', 'Mom & Baby'),
+    ('Emoon', 'Mom & Baby'),
+    ('vitadiary', 'Mom & Baby'),
+    ('Mykingdom', 'Mom & Baby'),
     ('Best Nutrition', 'Health & EL'),
     ('Codeage', 'Health & EL'),
     ('Fresheen Health', 'Health & EL'),
+    ('Brushie', 'Health & EL'),
+    ('Tranyoo', 'Health & EL'),
+    ('GoChek', 'Health & EL'),
+    ('JETZT', 'Health & EL'),
+    ('dodoto', 'Health & EL'),
+    ('HECATECH', 'Health & EL'),
+    ('LG', 'Health & EL'),
+    ('Casio', 'Health & EL'),
+    ('Nagakawa', 'Health & EL'),
+    ('Imou', 'Health & EL'),
+    ('Samono', 'Health & EL'),
+    ('Kingsun', 'Health & EL'),
+    ('Gaabor', 'Health & EL'),
+    ('Fujihome', 'Health & EL'),
+    ('HD Hyundai Electric Co., Ltd.', 'Health & EL'),
+    ('Di Động Việt', 'Health & EL'),
+    ('F.Studio By FPT', 'Health & EL'),
     ('KAO', 'FMCG'),
-    ('kenvue', 'FMCG')
+    ('kenvue', 'FMCG'),
+    ('masuto', 'FMCG')
   )
-  -- THU TU QUAN TRONG: ghi brand_channel TRUOC khi doi category_id.
-  -- Sau khi doi, khong con doc duoc kenh cu tu chinh dong brand nua, va SOCOM
-  -- se mat quyen xem brand ho vua lam (brand_read chi con ve "nganh cua toi").
+  -- THU TU QUAN TRONG: ghi brand_channel TRUOC khi doi category_id. Sau khi
+  -- doi thi khong con doc duoc kenh cu tu dong brand nua, va SOCOM se mat
+  -- quyen xem brand ho vua lam (brand_read chi con ve "nganh cua toi").
   insert into brand_channel (brand_id, category_id)
   select b.id, b.category_id
-  from xep x
-  join brand b on b.name = x.ten_brand
+  from xep x join brand b on b.name = x.ten_brand
   where b.category_id is not null
   on conflict do nothing;
 
@@ -184,6 +261,8 @@ begin;
     ('Wonjin', 'Beauty'),
     ('kosmen', 'Beauty'),
     ('ファイントゥデイ FineToday Co., Ltd.', 'Beauty'),
+    ('Keyshu', 'Beauty'),
+    ('C-Store Vietnam', 'Beauty'),
     ('Ăn Cùng Bà Tuyết', 'F&B'),
     ('AB InBev Southeast Asia', 'F&B'),
     ('budweiser', 'F&B'),
@@ -210,48 +289,69 @@ begin;
     ('Sixdo', 'Fashion'),
     ('Thiều Hoa', 'Fashion'),
     ('Tingoan', 'Fashion'),
+    ('halita', 'Fashion'),
+    ('Bemine', 'Fashion'),
+    ('Rechic', 'Fashion'),
+    ('Bbstore''S', 'Fashion'),
+    ('Libe', 'Fashion'),
+    ('Embes', 'Fashion'),
+    ('rabity', 'Fashion'),
+    ('Khatoco', 'Fashion'),
+    ('Kính Mắt Anna', 'Fashion'),
+    ('Visecret', 'Fashion'),
     ('Bebechic', 'Mom & Baby'),
     ('D - Nee', 'Mom & Baby'),
+    ('Emoon', 'Mom & Baby'),
+    ('vitadiary', 'Mom & Baby'),
+    ('Mykingdom', 'Mom & Baby'),
     ('Best Nutrition', 'Health & EL'),
     ('Codeage', 'Health & EL'),
     ('Fresheen Health', 'Health & EL'),
+    ('Brushie', 'Health & EL'),
+    ('Tranyoo', 'Health & EL'),
+    ('GoChek', 'Health & EL'),
+    ('JETZT', 'Health & EL'),
+    ('dodoto', 'Health & EL'),
+    ('HECATECH', 'Health & EL'),
+    ('LG', 'Health & EL'),
+    ('Casio', 'Health & EL'),
+    ('Nagakawa', 'Health & EL'),
+    ('Imou', 'Health & EL'),
+    ('Samono', 'Health & EL'),
+    ('Kingsun', 'Health & EL'),
+    ('Gaabor', 'Health & EL'),
+    ('Fujihome', 'Health & EL'),
+    ('HD Hyundai Electric Co., Ltd.', 'Health & EL'),
+    ('Di Động Việt', 'Health & EL'),
+    ('F.Studio By FPT', 'Health & EL'),
     ('KAO', 'FMCG'),
-    ('kenvue', 'FMCG')
+    ('kenvue', 'FMCG'),
+    ('masuto', 'FMCG')
   )
-  update brand b
-     set category_id = c.id
+  update brand b set category_id = c.id
     from xep x, category c
-   where b.name = x.ten_brand
-     and c.name = x.ten_nganh;
+   where b.name = x.ten_brand and c.name = x.ten_nganh;
 
-  -- Phai ra 46. Khac thi roll back.
-  select count(*) as da_doi
-  from brand b join category c on c.id = b.category_id
-  where c.name in ('Beauty','F&B','Fashion','Mom & Baby','Health & EL','FMCG')
-    and exists (select 1 from brand_channel bc where bc.brand_id = b.id);
+  -- Phai ra 79. Khac thi roll back.
+  select count(*) as da_doi from brand b
+  join brand_channel bc on bc.brand_id = b.id
+  join category c on c.id = b.category_id
+  where c.kind = 'product';
 
 commit;
 
 -- ---------------------------------------------------------------------------
--- PHAN 3 - CHI DOC. 47 brand con lai, de nguoi quyet.
+-- PHAN 3 - CHI DOC. 14 cai con lai, de nguoi quyet.
 -- ---------------------------------------------------------------------------
 
-select
-  b.name,
+select b.name,
   (select count(*) from contact ct where ct.brand_id = b.id) as so_contact,
   (select string_agg(distinct ct.company, ' / ')
      from contact ct where ct.brand_id = b.id and ct.company is not null) as cong_ty_nguoi_ta_khai
-from brand b
-join category c on c.id = b.category_id and c.kind = 'channel'
-group by b.id, b.name
-order by 2 desc, b.name;
+from brand b join category c on c.id = b.category_id and c.kind = 'channel'
+group by b.id, b.name order by 2 desc, b.name;
 
--- Ba dong duoi day la RAC, khong phai brand. Xoa duoc neu khong con contact:
---   'Self-employed'
---   'Unsorted from LinkedIn links'
---   'linkedin.com/in/nhung-la-8b8315b4?originalSubdomain=vn'
---
--- Va may cap trung ten can gop, khong lien quan Livestream:
+-- Va bon cap trung ten can gop, khong lien quan Livestream:
 --   Tai Ky Food - Flour Joint Stock / Tai Ky Food Flour JSC / Taiky Food
 --   Thien Huong Food Joint Stock Company / Thien Huong Food JSC
 --   Kim Dong / Kim Dong Publishing House
