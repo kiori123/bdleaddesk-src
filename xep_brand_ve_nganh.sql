@@ -189,8 +189,25 @@ group by x.ten_nganh order by count(*) desc;
 --
 --     kind = 'product' vi no la nganh that de xep brand vao, khong phai kenh.
 --     Chay lai nhieu lan khong sao - `where not exists` lo phan do.
+--
+--     SLUG KHONG PHAI 'else'. Bang category co unique tren slug, va slug
+--     'else' DA BI CHIEM - boi dong ten "Health & EL". Hai dong dang lech
+--     slug so voi ten:
+--         slug=else       -> name="Health & EL"
+--         slug=health-el  -> name="China Project"
+--     Dau hieu cua viec doi ten category: addCategory() ghi slug mot lan luc
+--     tao va khong co duong nao cap nhat no khi ten doi. Lech nay vo hai voi
+--     app (khong cho nao DOC slug ca, chi ghi), nhung unique tren slug thi
+--     van chan insert - va do la cai 400 dau tien cua file nay.
+--
+--     Chon slug con trong thay vi sua slug cu: sua slug la dong vao du lieu
+--     khong lien quan gi den viec dang lam, va de lam mot minh thi phai nhin
+--     ky ca hai dong truoc.
 insert into category (name, slug, active, kind)
-select 'Else', 'else', true, 'product'
+select 'Else',
+       (select s from (values ('else-khac'), ('else-2'), ('nganh-khac')) t(s)
+         where not exists (select 1 from category c2 where c2.slug = t.s) limit 1),
+       true, 'product'
 where not exists (select 1 from category where name = 'Else');
 
 -- 2b. Ghi dau vet kenh RO I doi nganh, trong cung mot cau lenh.
