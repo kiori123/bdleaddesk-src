@@ -24,6 +24,12 @@ export default async function ResultsPage({
   const first = await pollJob(jobId);
   if (!first) notFound();
 
+  // Ten nganh dang bi tru credit cho lan quet nay. Man hinh can TEN de noi
+  // thanh cau, khong phai id.
+  const { data: nganhTraTien } = job.category_id
+    ? await db.from('category').select('id, name').eq('id', job.category_id).maybeSingle()
+    : { data: null };
+
   const p = (job.payload ?? {}) as any;
   const brandsAsked: string[] = Array.isArray(p.brands)
     ? p.brands.map((b: any) => b?.name).filter(Boolean)
@@ -45,6 +51,7 @@ export default async function ResultsPage({
       <Results
         jobId={jobId}
         categoryId={job.category_id}
+        categoryName={(nganhTraTien as any)?.name ?? null}
         initial={first}
         showChip={hasPrefs(p.prefs ?? {}) || Boolean(p.prefs?.chasing)}
       />

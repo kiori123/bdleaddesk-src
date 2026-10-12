@@ -143,6 +143,37 @@ function ThuTen({ brand, categoryId }: { brand: string; categoryId: string | nul
   );
 }
 
+/**
+ * Brand nay thuoc mot nganh khac voi nganh dang bi tru credit.
+ *
+ * Khong phai hong du lieu - schema tach san hai chieu:
+ *   credit_ledger.category_id  la ngan sach NAO tra tien
+ *   brand.category_id          la brand thuoc NGANH nao
+ * Nhung im lang thi PIC khong biet minh vua tieu ngan sach cua minh cho mot
+ * brand se hien duoi ten nganh khac, va bao cao hai ben se khong khop ma
+ * khong ai hieu vi sao. Da do tren DB that: 36 credit da di nhu vay, va
+ * khong chi rieng Livestream - F&B sang Mom & Baby la 7, FMCG sang Mom & Baby
+ * la 6.
+ *
+ * CHI CANH BAO, khong chan: mot dot day live cho Huggies tieu ngan sach
+ * SOCOM la chuyen co that va hop le. Cai sai duy nhat la lam no am tham.
+ */
+function LechNganh({ brand, nganhBrand, nganhTraTienId, nganhTraTien }: {
+  brand: string;
+  nganhBrand: { id: string; name: string } | null;
+  nganhTraTienId: string | null;
+  nganhTraTien: string | null;
+}) {
+  if (!nganhBrand || !nganhTraTienId || nganhBrand.id === nganhTraTienId) return null;
+  return (
+    <span className="text-[11.5px] text-red">
+      {brand} sits under <b>{nganhBrand.name}</b>
+      {nganhTraTien ? <> &mdash; revealing here spends <b>{nganhTraTien}</b>&rsquo;s credits, and the
+        contacts will show under {nganhBrand.name}.</> : '.'}
+    </span>
+  );
+}
+
 function Chip({ s }: { s: number }) {
   const k = strengthOf(s);
   const style =
@@ -233,8 +264,11 @@ function Giua({ children }: { children: React.ReactNode }) {
 }
 
 export default function Results({
-  jobId, categoryId, initial, showChip,
-}: { jobId: string; categoryId: string | null; initial: JobView; showChip: boolean }) {
+  jobId, categoryId, categoryName, initial, showChip,
+}: {
+  jobId: string; categoryId: string | null; categoryName: string | null;
+  initial: JobView; showChip: boolean;
+}) {
   const [view, setView] = useState<JobView>(initial);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -515,6 +549,12 @@ export default function Results({
                 : list.length}
             </span>
             <ThongKe s={statsByBrand.get(brand)} />
+            <LechNganh
+              brand={brand}
+              nganhBrand={view.nganhTheoBrand[brand] ?? null}
+              nganhTraTienId={categoryId}
+              nganhTraTien={categoryName}
+            />
           </div>
 
           <div className="grid gap-2">

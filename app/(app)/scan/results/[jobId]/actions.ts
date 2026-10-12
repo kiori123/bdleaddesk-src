@@ -75,6 +75,18 @@ export type JobView = {
    * 20 nguoi doc giong het mot brand chi co 20 nguoi.
    */
   tongTheoBrand: Record<string, number>;
+  /**
+   * Brand nay dang duoc xep vao NGANH nao, theo ten ngang.
+   *
+   * De man hinh canh bao khi nganh cua brand khac nganh dang bi tru credit.
+   * Hai thu nay la HAI CHIEU KHAC NHAU va schema da tach san chung:
+   *   credit_ledger.category_id  - ngan sach NAO tra tien
+   *   brand.category_id          - brand thuoc NGANH nao
+   * Lech nhau khong phai hong du lieu, nhung im lang thi PIC khong biet minh
+   * vua tieu ngan sach cua minh cho mot brand se hien duoi ten nganh khac.
+   * Da do: 36 credit da di nhu vay, va khong chi rieng Livestream.
+   */
+  nganhTheoBrand: Record<string, { id: string; name: string } | null>;
   /** total/outcome tung brand - xem BrandStat. */
   brandStats: BrandStat[];
   /**
@@ -168,6 +180,19 @@ export async function pollJob(jobId: string): Promise<JobView | null> {
    */
   const { hien: dsHien, tongTheoBrand } = catTheoBrand(dsXep);
 
+  // Nganh that cua tung brand co trong ket qua. Doc mot lan cho ca man hinh.
+  const brandIds = [...new Set(dsHien.map((c) => c.brand_id).filter(Boolean))] as string[];
+  const nganhTheoBrand: Record<string, { id: string; name: string } | null> = {};
+  if (brandIds.length) {
+    const { data: dsBrand } = await db
+      .from('brand').select('id, name, category:category_id (id, name)').in('id', brandIds);
+    for (const b of (dsBrand ?? []) as any[]) {
+      nganhTheoBrand[String(b.name)] = b.category
+        ? { id: String(b.category.id), name: String(b.category.name) }
+        : null;
+    }
+  }
+
   return {
     status: job.status,
     error: job.error,
@@ -179,6 +204,7 @@ export async function pollJob(jobId: string): Promise<JobView | null> {
     regionLabel: chiaDuoc && vung ? (timVung(vung)?.label ?? null) : null,
     candidates: dsHien,
     tongTheoBrand,
+    nganhTheoBrand,
   };
 }
 
