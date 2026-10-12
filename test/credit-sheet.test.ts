@@ -582,10 +582,12 @@ test('nhom khong co location duoc noi ro la bi loai khoi so sanh', () => {
 
 // --- Category bao cao tach rieng ------------------------------------------
 //
-// Livestream la KOL/streamer chu khong phai phap nhan doanh nghiep, nen
-// SignalHire gan nhu khong giu email cong ty cua ho. Tron vao trung binh
-// chung thi ca hai so deu sai - da sai that: mot tuan 96% khoi luong la
-// Livestream keo trung binh email tu 67% xuong 28%.
+// "Livestream" la KENH (SOCOM), khong phai mot nganh hang. Cung mot brand co
+// the nam o day hoac o nganh that cua no tuy ai nhap - mot dot day live cho
+// Huggies van la Mom & Baby. Nen no la lat cat di NGANG QUA cac nganh chu
+// khong dung canh chung, va gop vao mot trung binh la dem cung mot mang viec
+// hai lan: mot tuan co 96% khoi luong la Livestream keo trung binh email ca
+// ky tu 67% xuong 28%.
 //
 // Nhung TACH khong duoc thanh BO. Bo han thi nguoi doc khong co cach nao biet
 // la thieu, va do la kieu bao cao hong nhat - nguy hiem hon ca mot con so xau.
@@ -622,7 +624,8 @@ test('sheet NOI RO la co phan tach rieng va vi sao', () => {
   const chu = chuTrongSheet(veTach());
   assert.ok(/reported separately/i.test(chu), 'phai co tieu de noi ro day la phan tach rieng');
   assert.ok(/not in the totals/i.test(chu), 'phai noi ro no khong nam trong tong');
-  assert.ok(/work email/i.test(chu), 'phai giai thich vi sao tach - khong phai tach suong');
+  assert.ok(/channel, not a product category/i.test(chu),
+    'phai giai thich vi sao tach - khong phai tach suong');
 });
 
 test('dong Total KHONG cong so cua category tach rieng', () => {

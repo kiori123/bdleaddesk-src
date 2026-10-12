@@ -486,17 +486,20 @@ export async function dungWorkbookXuat(
   /**
    * Category bao cao TACH RIENG tren sheet Credit & Contacts.
    *
-   * Livestream la KOL/streamer chu khong phai phap nhan doanh nghiep, nen
-   * SignalHire gan nhu khong giu email cong ty cua ho: do tren du lieu that
-   * la 28% co email, so voi 50-61% cua cac nganh doanh nghiep. Gop chung vao
-   * mot trung binh thi ca hai con so deu sai - va da sai that: mot tuan co
-   * 96% khoi luong la Livestream keo trung binh email ca ky tu 67% xuong 28%,
-   * doc nhu toan bo cong cu xuong cap trong khi nganh doanh nghiep khong he
-   * doi.
+   * "Livestream" KHONG phai mot nganh hang, no la KENH (SOCOM). Cung mot
+   * brand co the nam o day hoac o nganh that cua no tuy ai nhap - mot dot day
+   * live cho Huggies van la Mom & Baby. Kiem tren DB that: 81 brand o day deu
+   * la brand doanh nghiep (Levi's, LG, Casio, Olay, KAO, Kenvue, AB InBev,
+   * Kymdan, Fahasa...), khong phai KOL hay streamer.
    *
-   * TACH chu KHONG BO. veSheetCreditContacts() in chung day du ngay duoi dong
-   * Total, kem mot cau noi ro vi sao. Bo han di thi nguoi doc khong co cach
-   * nao biet la thieu.
+   * Nen no la mot lat cat di NGANG QUA cac nganh chu khong dung canh chung.
+   * Gop vao mot trung binh la dem cung mot mang viec hai lan.
+   *
+   * Do duoc: 78 brand that, 197 contact, 28% co email so voi 50-61% o cac
+   * nganh. Nguyen nhan CHUA XAC MINH - dung ghi doan vao day.
+   *
+   * Day la cach chua TAM. Cach chua that la xep lai cac brand nay ve dung
+   * nganh cua chung; viec do can mat nguoi doc tung ten, khong tu dong duoc.
    *
    * So khop theo TEN da chuan hoa chu khong theo id: id khac nhau giua cac moi
    * truong, con ten thi admin doc duoc va sua duoc ngay tai day.

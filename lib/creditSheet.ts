@@ -191,16 +191,28 @@ export function veSheetCreditContacts(
      * Category bao cao TACH RIENG, khong gop vao tong va khong xep hang cung
      * nhom con lai.
      *
-     * Ly do ton tai: Livestream la KOL/streamer, khong phai phap nhan doanh
-     * nghiep, nen SignalHire gan nhu khong co email cong ty cua ho - do tren
-     * du lieu that la 28% so voi 50-61% cua cac nganh doanh nghiep. Tron vao
-     * mot trung binh chung thi ca hai so deu sai: nganh doanh nghiep bi keo
-     * xuong, con Livestream thi bi cham diem bang mot thuoc do khong danh cho
-     * no.
+     * Ly do ton tai: "Livestream" KHONG phai mot nganh hang, no la KENH
+     * (SOCOM). Cung mot brand co the nam o day hoac nam o nganh that cua no,
+     * tuy ai la nguoi nhap - mot dot day live cho Huggies van la Mom & Baby.
+     * Kiem tren DB that: 81 brand trong Livestream la brand doanh nghiep that
+     * - Levi's, LG, Casio, Olay, KAO, Kenvue, AB InBev, Kymdan, Fahasa...
+     *
+     * Vi vay no khong phai mot nganh ngang hang voi Beauty hay F&B de dem ra
+     * so; no la mot lat cat di ngang qua tat ca. Gop vao mot trung binh chung
+     * la mo ta cung mot mang viec hai lan va lam lech ca hai phia.
+     *
+     * Do duoc: 78 brand that, 197 contact, 28% co email, so voi 50-61% cua
+     * cac nganh hang. VI SAO lech thi CHUA BIET - dung doan. Phan lon brand o
+     * day la hang quoc te (LG, Casio, Moroccanoil, Olay) nen co the SignalHire
+     * tra ve nhan su toan cau voi du lieu mong hon, nhung do moi la gia thuyet
+     * chua kiem.
      *
      * TACH chu KHONG BO. Chung van duoc in day du o ngay duoi bang, co tieu de
      * rieng va mot cau noi ro vi sao. Bo han di thi nguoi doc khong co cach
      * nao biet la thieu, va do la kieu bao cao hong nhat.
+     *
+     * Day la cach chua TAM. Cach chua that la xep lai 78 brand do ve dung
+     * nganh cua chung - viec do can mat nguoi, khong tu dong duoc.
      */
     tachRieng?: CatRow[];
     /** Phan tich nguyen nhan theo noi nguoi do ngoi - xem ViTriRow. */
@@ -499,9 +511,11 @@ export function veSheetCreditContacts(
     rIdx += 1;
     ws.mergeCells(`A${rIdx}:K${rIdx}`);
     ws.getRow(rIdx).getCell(1).value =
-      'These are creators and streamers, not companies, so SignalHire rarely holds a work email for them'
-      + ' - 28% against 50-61% for the corporate categories. Blending them into one average misreports both:'
-      + ' it drags the corporate figure down and judges this one by a yardstick built for a different business.';
+      'Livestream is a channel, not a product category. The same brand lands here or in its own'
+      + ' category depending on who filed it - a live push for Huggies is still Mom & Baby - so these'
+      + ' rows cut across the categories above rather than sitting beside them, and averaging the two'
+      + ' together describes the same work twice. Email coverage here is 28% against 50-61% elsewhere;'
+      + ' why is not yet established.';
     ws.getRow(rIdx).getCell(1).font = { italic: true, size: 10, color: { argb: 'FF6F878B' } };
     ws.getRow(rIdx).alignment = { wrapText: true, vertical: 'top' };
     ws.getRow(rIdx).height = 28;
